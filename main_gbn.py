@@ -54,7 +54,7 @@ parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
 parser.add_argument('-b', '--batch-size', default=2048, type=int,
                     metavar='N', help='mini-batch size (default: 2048)')
 parser.add_argument('-mb', '--mini-batch-size', default=128, type=int,
-                    help='mini-mini-batch size (default: 64)')
+                    help='mini-mini-batch size (default: 128)')
 parser.add_argument('--lr_bb_fix', dest='lr_bb_fix', action='store_true',
                     help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
 parser.add_argument('--no-lr_bb_fix', dest='lr_bb_fix', action='store_false',
@@ -73,6 +73,8 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
+parser.add_argument('--sharpness-smoothing', '--ss', default=1e-4, type=float,
+                    metavar='SS', help='sharpness smoothing (default: 1e-4)')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -294,6 +296,11 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             top5.update(prec5[0], input_var.size(0))
 
         else:
+            # randomly change current model
+            for p in model.parameters():
+                noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
+                p.data.add_( noise )
+                #p.data.add_((torch.rand(p.size()).cuda() * 2.0 - 1.0) * args.sharpness_smoothing * optimizer.param_groups[0]['lr'])
 
             mini_inputs = input_var.chunk(args.batch_size // args.mini_batch_size)
             mini_targets = target_var.chunk(args.batch_size // args.mini_batch_size)

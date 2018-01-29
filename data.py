@@ -1,7 +1,7 @@
 import os
 import torchvision.datasets as datasets
 
-__DATASETS_DEFAULT_PATH = '/media/ssd/Datasets/'
+__DATASETS_DEFAULT_PATH = '~/dataset/pytorch-gen'
 
 
 def get_dataset(name, split='train', transform=None,
