@@ -327,10 +327,10 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 loss.backward()
 
                 # denoise @ each mini-mini-batch. Do we need denoising???
+                noise_idx = 0
                 for p in model.parameters():
-                  noise_idx -= 1
                   p.data.sub_(noises[noise_idx])
-                assert (0==noise_idx)
+                  noise_idx += 1
 
             for p in model.parameters():
                 p.grad.data.div_(len(mini_inputs))
