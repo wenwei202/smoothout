@@ -296,12 +296,6 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             top5.update(prec5[0], input_var.size(0))
 
         else:
-            # randomly change current model
-            for p in model.parameters():
-                noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
-                p.data.add_( noise )
-                #p.data.add_((torch.rand(p.size()).cuda() * 2.0 - 1.0) * args.sharpness_smoothing * optimizer.param_groups[0]['lr'])
-
             mini_inputs = input_var.chunk(args.batch_size // args.mini_batch_size)
             mini_targets = target_var.chunk(args.batch_size // args.mini_batch_size)
 
@@ -309,6 +303,17 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             optimizer.zero_grad()
 
             for k, mini_input_var in enumerate(mini_inputs):
+
+                noises = {}
+                noise_idx = 0
+                # randomly change current model @ each mini-mini-batch
+                for p in model.parameters():
+                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
+                  noises[noise_idx] = noise
+                  noise_idx += 1
+                  p.data.add_(noise)
+                  # p.data.add_((torch.rand(p.size()).cuda() * 2.0 - 1.0) * args.sharpness_smoothing * optimizer.param_groups[0]['lr'])
+
                 mini_target_var = mini_targets[k]
                 output = model(mini_input_var)
                 loss = criterion(output, mini_target_var)
@@ -320,6 +325,12 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
                 # compute gradient and do SGD step
                 loss.backward()
+
+                # denoise @ each mini-mini-batch. Do we need denoising???
+                for p in model.parameters():
+                  noise_idx -= 1
+                  p.data.sub_(noises[noise_idx])
+                assert (0==noise_idx)
 
             for p in model.parameters():
                 p.grad.data.div_(len(mini_inputs))
