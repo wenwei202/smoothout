@@ -89,7 +89,7 @@ def main():
     best_prec1 = 0
     args = parser.parse_args()
     if args.regime_bb_fix:
-            args.epochs *= ceil(args.batch_size / args.mini_batch_size)
+            args.epochs *= (int)(ceil(args.batch_size / args.mini_batch_size))
 
     if args.evaluate:
         args.results_dir = '/tmp'
