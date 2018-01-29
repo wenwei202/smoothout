@@ -185,7 +185,15 @@ def main():
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        validate(val_loader, model, criterion, 0)
+        val_result = validate(val_loader, model, criterion, 0)
+        val_loss, val_prec1, val_prec5 = [val_result[r]
+                                          for r in ['loss', 'prec1', 'prec5']]
+        logging.info('\nValidation Loss {val_loss:.4f} \t'
+                     'Validation Prec@1 {val_prec1:.3f} \t'
+                     'Validation Prec@5 {val_prec5:.3f} \n'
+                     .format(val_loss=val_loss,
+                             val_prec1=val_prec1,
+                             val_prec5=val_prec5))
         return
 
     train_data = get_dataset(args.dataset, 'train', transform['train'])
