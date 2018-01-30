@@ -98,6 +98,8 @@ def main():
     save_path = os.path.join(args.results_dir, args.save)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+    else:
+      raise OSError('Directory {%s} exists. Use a new one.' % save_path)
 
     setup_logging(os.path.join(save_path, 'log.txt'))
     results_file = os.path.join(save_path, 'results.%s')

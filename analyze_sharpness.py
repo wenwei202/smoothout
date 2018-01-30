@@ -1,4 +1,6 @@
 import pdb
+import numpy as np
+import copy
 import argparse
 import os
 import time
@@ -80,8 +82,11 @@ parser.add_argument('--print-freq', '-p', default=10, type=int,
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
-                    help='evaluate model FILE on validation set')
-
+                    help='master evaluate model FILE on validation set')
+parser.add_argument('-se', '--slave_evaluate', type=str, metavar='FILE',
+                    help='slave evaluate model FILE on validation set')
+parser.add_argument('--alpha', type=str, default='-1:0.25:2', metavar='FILE',
+                    help='coefficient of linear combination of parameters of master and slave model')
 
 def main():
     torch.manual_seed(123)
@@ -98,6 +103,8 @@ def main():
     save_path = os.path.join(args.results_dir, args.save)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+    else:
+        raise OSError('Directory {%s} exists. Use a new one.' % save_path)
 
     setup_logging(os.path.join(save_path, 'log.txt'))
     results_file = os.path.join(save_path, 'results.%s')
@@ -125,6 +132,22 @@ def main():
     model = model(**model_config)
     logging.info("created model with configuration: %s", model_config)
 
+
+    # optionally preload from a slave and master models
+    slave_model = None
+    master_model = None
+    alpha = [0.]
+    if args.slave_evaluate:
+      if not os.path.isfile(args.slave_evaluate):
+        parser.error('invalid slave checkpoint: {}'.format(args.slave_evaluate))
+      checkpoint = torch.load(args.slave_evaluate)
+      model.load_state_dict(checkpoint['state_dict'])
+      logging.info("loaded slave checkpoint '%s' (epoch %s)",
+                   args.slave_evaluate, checkpoint['epoch'])
+      slave_model = copy.deepcopy(model)
+      alpha_str = args.alpha.split(':')
+      alpha = np.arange(float(alpha_str[0]),float(alpha_str[2]),float(alpha_str[1]))
+
     # optionally resume from a checkpoint
     if args.evaluate:
         if not os.path.isfile(args.evaluate):
@@ -133,6 +156,7 @@ def main():
         model.load_state_dict(checkpoint['state_dict'])
         logging.info("loaded checkpoint '%s' (epoch %s)",
                      args.evaluate, checkpoint['epoch'])
+        master_model = copy.deepcopy(model)
     elif args.resume:
         checkpoint_file = args.resume
         if os.path.isdir(checkpoint_file):
@@ -185,15 +209,24 @@ def main():
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        val_result = validate(val_loader, model, criterion, 0)
-        val_loss, val_prec1, val_prec5 = [val_result[r]
-                                          for r in ['loss', 'prec1', 'prec5']]
-        logging.info('\nValidation Loss {val_loss:.4f} \t'
-                     'Validation Prec@1 {val_prec1:.3f} \t'
-                     'Validation Prec@5 {val_prec5:.3f} \n'
-                     .format(val_loss=val_loss,
-                             val_prec1=val_prec1,
-                             val_prec5=val_prec5))
+        if not args.slave_evaluate:
+          raise ValueError('Please set --args.slave_evaluate')
+
+        # for each alpha, modify weights and evaluate
+        for _alpha in alpha:
+          for p, p_m, p_s in zip(model.parameters(), master_model.parameters(), slave_model.parameters()):
+            p.data = (1-_alpha) * p_m.data + _alpha * p_s.data
+
+          model.cuda()
+          val_result = validate(val_loader, model, criterion, 0)
+          val_loss, val_prec1, val_prec5 = [val_result[r]
+                                            for r in ['loss', 'prec1', 'prec5']]
+          logging.info('\nValidation Loss {val_loss:.4f} \t'
+                       'Validation Prec@1 {val_prec1:.3f} \t'
+                       'Validation Prec@5 {val_prec5:.3f} \n'
+                       .format(val_loss=val_loss,
+                               val_prec1=val_prec1,
+                               val_prec5=val_prec5))
         return
 
     train_data = get_dataset(args.dataset, 'train', transform['train'])
