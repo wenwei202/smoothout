@@ -85,7 +85,7 @@ parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='master evaluate model FILE on validation set')
 parser.add_argument('-se', '--slave_evaluate', type=str, metavar='FILE',
                     help='slave evaluate model FILE on validation set')
-parser.add_argument('--alpha', type=str, default='-1:0.25:2', metavar='FILE',
+parser.add_argument('--alpha', type=str, default='-1.0:0.25:2.01', metavar='FILE',
                     help='coefficient of linear combination of parameters of master and slave model')
 
 def main():
@@ -221,10 +221,12 @@ def main():
           val_result = validate(val_loader, model, criterion, 0)
           val_loss, val_prec1, val_prec5 = [val_result[r]
                                             for r in ['loss', 'prec1', 'prec5']]
-          logging.info('\nValidation Loss {val_loss:.4f} \t'
+          logging.info('\nalpha {_alpha} \t'
+                       'Validation Loss {val_loss:.4f} \t'
                        'Validation Prec@1 {val_prec1:.3f} \t'
                        'Validation Prec@5 {val_prec5:.3f} \n'
-                       .format(val_loss=val_loss,
+                       .format(_alpha=_alpha,
+                               val_loss=val_loss,
                                val_prec1=val_prec1,
                                val_prec5=val_prec5))
         return
