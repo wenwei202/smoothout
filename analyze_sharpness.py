@@ -85,7 +85,7 @@ parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='master evaluate model FILE on validation set')
 parser.add_argument('-se', '--slave_evaluate', type=str, metavar='FILE',
                     help='slave evaluate model FILE on validation set')
-parser.add_argument('--alpha', type=str, default='-1.0:0.25:2.01', metavar='FILE',
+parser.add_argument('--alpha', type=str, default='-1.0:0.1:2.01', metavar='FILE',
                     help='coefficient of linear combination of parameters of master and slave model')
 
 def main():
@@ -186,11 +186,18 @@ def main():
         val_data,
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
+    train_data = get_dataset(args.dataset, 'train', transform['train'])
+    train_loader = torch.utils.data.DataLoader(
+      train_data,
+      batch_size=args.batch_size, shuffle=True,
+      num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
         if not args.slave_evaluate:
           raise ValueError('Please set --args.slave_evaluate')
 
+        data_res = np.zeros((len(alpha), 4))
+        data_idx = 0
         # for each alpha, modify weights and evaluate
         for _alpha in alpha:
           mydict = {}
@@ -210,13 +217,48 @@ def main():
                                val_loss=val_loss,
                                val_prec1=val_prec1,
                                val_prec5=val_prec5))
+
+          train_result = validate(train_loader, model, criterion, 0)
+          train_loss, train_prec1, train_prec5 = [train_result[r]
+                                            for r in ['loss', 'prec1', 'prec5']]
+          logging.info('\nalpha {_alpha} \t'
+                       'Train Loss {train_loss:.4f} \t'
+                       'Train Prec@1 {train_prec1:.3f} \t'
+                       'Train Prec@5 {train_prec5:.3f} \n'
+                       .format(_alpha=_alpha,
+                               train_loss= train_loss,
+                               train_prec1=train_prec1,
+                               train_prec5=train_prec5))
+          data_res[data_idx, 0] = val_loss
+          data_res[data_idx, 1] = val_prec1
+          data_res[data_idx, 2] = train_loss
+          data_res[data_idx, 3] = train_prec1
+          data_idx += 1
+
+        # plotting
+        import matplotlib.pyplot as plt
+        fig, ax1 = plt.subplots()
+        ax2 = ax1.twinx()
+        ax1.semilogy(alpha, data_res[:, 0], 'b-')
+        ax1.semilogy(alpha, data_res[:, 2], 'b--')
+        #ax1.plot(alpha, data_res[:, 0], 'b-')
+        #ax1.plot(alpha, data_res[:, 2], 'b--')
+
+        ax2.plot(alpha, data_res[:, 1], 'r-')
+        ax2.plot(alpha, data_res[:, 3], 'r--')
+
+        ax1.set_xlabel('alpha')
+        ax1.set_ylabel('Cross Entropy', color='b')
+        ax2.set_ylabel('Accuracy', color='r')
+        ax1.legend(('Train', 'Test'), loc=0)
+
+#        ax1.grid(b=True, which='both')
+        plt.savefig('res.pdf')
+        plt.show()
+        print 'Done'
         return
 
-    train_data = get_dataset(args.dataset, 'train', transform['train'])
-    train_loader = torch.utils.data.DataLoader(
-        train_data,
-        batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+
 
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
     logging.info('training regime: %s', regime)
