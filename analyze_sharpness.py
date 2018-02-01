@@ -134,17 +134,15 @@ def main():
 
 
     # optionally preload from a slave and master models
-    slave_model = None
-    master_model = None
+    slave_checkpoint = None
+    master_checkpoint = None
     alpha = [0.]
     if args.slave_evaluate:
       if not os.path.isfile(args.slave_evaluate):
         parser.error('invalid slave checkpoint: {}'.format(args.slave_evaluate))
-      checkpoint = torch.load(args.slave_evaluate)
-      model.load_state_dict(checkpoint['state_dict'])
+      slave_checkpoint = torch.load(args.slave_evaluate)
       logging.info("loaded slave checkpoint '%s' (epoch %s)",
-                   args.slave_evaluate, checkpoint['epoch'])
-      slave_model = copy.deepcopy(model)
+                   args.slave_evaluate, slave_checkpoint['epoch'])
       alpha_str = args.alpha.split(':')
       alpha = np.arange(float(alpha_str[0]),float(alpha_str[2]),float(alpha_str[1]))
 
@@ -152,30 +150,11 @@ def main():
     if args.evaluate:
         if not os.path.isfile(args.evaluate):
             parser.error('invalid checkpoint: {}'.format(args.evaluate))
-        checkpoint = torch.load(args.evaluate)
-        model.load_state_dict(checkpoint['state_dict'])
+        master_checkpoint = torch.load(args.evaluate)
         logging.info("loaded checkpoint '%s' (epoch %s)",
-                     args.evaluate, checkpoint['epoch'])
-        master_model = copy.deepcopy(model)
+                     args.evaluate, master_checkpoint['epoch'])
     elif args.resume:
-        checkpoint_file = args.resume
-        if os.path.isdir(checkpoint_file):
-            results.load(os.path.join(checkpoint_file, 'results.csv'))
-            checkpoint_file = os.path.join(
-                checkpoint_file, 'model_best.pth.tar')
-        if os.path.isfile(checkpoint_file):
-            logging.info("loading checkpoint '%s'", args.resume)
-            checkpoint = torch.load(checkpoint_file)
-            args.start_epoch = checkpoint['epoch'] + 1
-            best_prec1 = checkpoint['best_prec1']
-            model.load_state_dict(checkpoint['state_dict'])
-            logging.info("loaded checkpoint '%s' (epoch %s)",
-                         checkpoint_file, checkpoint['epoch'])
-        else:
-            logging.error("no checkpoint found at '%s'", args.resume)
-
-    num_parameters = sum([l.nelement() for l in model.parameters()])
-    logging.info("number of parameters: %d", num_parameters)
+        raise NotImplementedError('resume disabled')
 
     # Data loading code
     default_transform = {
@@ -214,10 +193,12 @@ def main():
 
         # for each alpha, modify weights and evaluate
         for _alpha in alpha:
-          for p, p_m, p_s in zip(model.parameters(), master_model.parameters(), slave_model.parameters()):
-            p.data = (1-_alpha) * p_m.data + _alpha * p_s.data
+          mydict = {}
+          for key, value in slave_checkpoint['state_dict'].iteritems():
+            np_val = value.cpu().numpy() * _alpha + (1 - _alpha) * master_checkpoint['state_dict'][key].cpu().numpy()
+            mydict[key] = torch.from_numpy(np_val).cuda()
+          model.load_state_dict(mydict)
 
-          model.cuda()
           val_result = validate(val_loader, model, criterion, 0)
           val_loss, val_prec1, val_prec5 = [val_result[r]
                                             for r in ['loss', 'prec1', 'prec5']]
