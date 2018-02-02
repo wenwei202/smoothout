@@ -239,18 +239,18 @@ def main():
         import matplotlib.pyplot as plt
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
-        ax1.semilogy(alpha, data_res[:, 0], 'b-')
-        ax1.semilogy(alpha, data_res[:, 2], 'b--')
+        ax1.semilogy(alpha, data_res[:, 0], 'b--')
+        ax1.semilogy(alpha, data_res[:, 2], 'b-')
         #ax1.plot(alpha, data_res[:, 0], 'b-')
         #ax1.plot(alpha, data_res[:, 2], 'b--')
 
-        ax2.plot(alpha, data_res[:, 1], 'r-')
-        ax2.plot(alpha, data_res[:, 3], 'r--')
+        ax2.plot(alpha, data_res[:, 1], 'r--')
+        ax2.plot(alpha, data_res[:, 3], 'r-')
 
         ax1.set_xlabel('alpha')
         ax1.set_ylabel('Cross Entropy', color='b')
         ax2.set_ylabel('Accuracy', color='r')
-        ax1.legend(('Train', 'Test'), loc=0)
+        ax1.legend(('Test', 'Train'), loc=0)
 
 #        ax1.grid(b=True, which='both')
         plt.savefig('res.pdf')
