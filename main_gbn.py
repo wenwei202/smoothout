@@ -65,16 +65,16 @@ parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true'
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
                     help='regime fix for big batch e = e0*(batch_size/128)')
 parser.set_defaults(regime_bb_fix=False)
-parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
+parser.add_argument('--optimizer', default='Adam', type=str, metavar='OPT',
                     help='optimizer function used')
-parser.add_argument('--lr', '--learning_rate', default=0.1, type=float,
+parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
-parser.add_argument('--sharpness-smoothing', '--ss', default=1e-4, type=float,
-                    metavar='SS', help='sharpness smoothing (default: 1e-4)')
+parser.add_argument('--sharpness-smoothing', '--ss', default=0.0, type=float,
+                    metavar='SS', help='sharpness smoothing (default: 0)')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -163,7 +163,12 @@ def main():
                               input_size=args.input_size, augment=False)
     }
     transform = getattr(model, 'input_transform', default_transform)
-    regime = getattr(model, 'regime', {0: {'optimizer': args.optimizer,
+    if args.optimizer == 'Adam':
+      regime = {'optimizer': args.optimizer,
+                'lr': args.lr,
+                'weight_decay': args.weight_decay}
+    else:
+      regime = getattr(model, 'regime', {0: {'optimizer': args.optimizer,
                                            'lr': args.lr,
                                            'momentum': args.momentum,
                                            'weight_decay': args.weight_decay}})
