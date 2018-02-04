@@ -164,9 +164,9 @@ def main():
     }
     transform = getattr(model, 'input_transform', default_transform)
     if args.optimizer == 'Adam':
-      regime = {'optimizer': args.optimizer,
+      regime = {0: {'optimizer': args.optimizer,
                 'lr': args.lr,
-                'weight_decay': args.weight_decay}
+                'weight_decay': args.weight_decay}}
     else:
       regime = getattr(model, 'regime', {0: {'optimizer': args.optimizer,
                                            'lr': args.lr,
