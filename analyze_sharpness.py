@@ -140,7 +140,7 @@ def main():
     if args.slave_evaluate:
       if not os.path.isfile(args.slave_evaluate):
         parser.error('invalid slave checkpoint: {}'.format(args.slave_evaluate))
-      slave_checkpoint = torch.load(args.slave_evaluate)
+      slave_checkpoint = torch.load(args.slave_evaluate, map_location=lambda storage, loc: storage)
       logging.info("loaded slave checkpoint '%s' (epoch %s)",
                    args.slave_evaluate, slave_checkpoint['epoch'])
       alpha_str = args.alpha.split(':')
@@ -150,7 +150,7 @@ def main():
     if args.evaluate:
         if not os.path.isfile(args.evaluate):
             parser.error('invalid checkpoint: {}'.format(args.evaluate))
-        master_checkpoint = torch.load(args.evaluate)
+        master_checkpoint = torch.load(args.evaluate, map_location=lambda storage, loc: storage)
         logging.info("loaded checkpoint '%s' (epoch %s)",
                      args.evaluate, master_checkpoint['epoch'])
     elif args.resume:
