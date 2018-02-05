@@ -13,7 +13,7 @@ It is based off [convNet.pytorch](https://github.com/eladhoffer/convNet.pytorch)
 - [pytorch](<http://www.pytorch.org>)
 - [torchvision](<https://github.com/pytorch/vision>) to load the datasets, perform image transforms
 - [pandas](<http://pandas.pydata.org/>) for logging to csv
-- [bokeh](<http://bokeh.pydata.org>) for training visualization
+- [bokeh](<http://bokeh.pydata.org>) for training visualization `conda install bokeh=0.12.0`
 
 
 ## Data
