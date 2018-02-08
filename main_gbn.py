@@ -231,7 +231,7 @@ def main():
             'state_dict': model.state_dict(),
             'best_prec1': best_prec1,
             'regime': regime
-        }, is_best, path=save_path)
+        }, is_best, path=save_path, save_all=True)
         logging.info('\n Epoch: {0}\t'
                      'Training Loss {train_loss:.4f} \t'
                      'Training Prec@1 {train_prec1:.3f} \t'
