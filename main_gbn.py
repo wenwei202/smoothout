@@ -75,6 +75,8 @@ parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
 parser.add_argument('--sharpness-smoothing', '--ss', default=0.0, type=float,
                     metavar='SS', help='sharpness smoothing (default: 0)')
+parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
+                    metavar='AI', help='Annealing index of noise (default: 0.55)')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -315,8 +317,10 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 noise_idx = 0
                 # randomly change current model @ each mini-mini-batch
                 for p in model.parameters():
-                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
-                  #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * optimizer.param_groups[0]['lr']
+                  #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
+                  anneal_coef = 1.0 / ((1 + epoch * len(data_loader) + i) ** args.anneal_index)
+                  anneal_coef = anneal_coef ** 0.5
+                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * anneal_coef
                   noises[noise_idx] = noise
                   noise_idx += 1
                   p.data.add_(noise)
