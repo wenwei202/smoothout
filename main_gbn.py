@@ -65,7 +65,7 @@ parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true'
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
                     help='regime fix for big batch e = e0*(batch_size/128)')
 parser.set_defaults(regime_bb_fix=False)
-parser.add_argument('--optimizer', default='Adam', type=str, metavar='OPT',
+parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
                     help='optimizer function used')
 parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate')
