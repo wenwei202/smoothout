@@ -60,6 +60,11 @@ parser.add_argument('--lr_bb_fix', dest='lr_bb_fix', action='store_true',
 parser.add_argument('--no-lr_bb_fix', dest='lr_bb_fix', action='store_false',
                     help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
 parser.set_defaults(lr_bb_fix=True)
+parser.add_argument('--save_all', dest='save_all', action='store_true',
+                    help='save all better checkpoints')
+parser.add_argument('--no-save_all', dest='save_all', action='store_false',
+                    help='save all better checkpoints')
+parser.set_defaults(save_all=False)
 parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true',
                     help='regime fix for big batch e = e0*(batch_size/128)')
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
@@ -233,7 +238,7 @@ def main():
             'state_dict': model.state_dict(),
             'best_prec1': best_prec1,
             'regime': regime
-        }, is_best, path=save_path, save_all=True)
+        }, is_best, path=save_path, save_all=args.save_all)
         logging.info('\n Epoch: {0}\t'
                      'Training Loss {train_loss:.4f} \t'
                      'Training Prec@1 {train_prec1:.3f} \t'
