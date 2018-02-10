@@ -31,7 +31,7 @@ class AlexNet(nn.Module):
         )
         self.regime = {
             0: {'optimizer': 'SGD', 'lr': 1e-3,
-                'weight_decay': 5e-4},
+                'weight_decay': 5e-4, 'momentum': 0.9},
             60: {'lr': 1e-2},
             120: {'lr': 1e-3},
             180: {'lr': 1e-4}
