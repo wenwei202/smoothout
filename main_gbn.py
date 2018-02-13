@@ -19,6 +19,7 @@ from utils import *
 from ast import literal_eval
 from torch.nn.utils import clip_grad_norm
 from math import ceil
+import numpy as np
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -87,6 +88,10 @@ parser.add_argument('--sharpness-smoothing', '--ss', default=0.0, type=float,
                     metavar='SS', help='sharpness smoothing (default: 0)')
 parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
                     metavar='AI', help='Annealing index of noise (default: 0.55)')
+parser.add_argument('--tanh-scale', '--ts', default=10., type=float,
+                    metavar='TS', help='scale of transition in tanh')
+parser.add_argument('--smoothing-type', default='tanh', type=str, metavar='ST',
+                    help='The type of chaning smoothing noise: constant, anneal, or tanh')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -321,6 +326,22 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
             optimizer.zero_grad()
 
+            # get the coefficent to scale noise
+            if args.smoothing_type == 'constant':
+              noise_coef = 1.
+            elif args.smoothing_type == 'anneal':
+              noise_coef = 1.0 / ((1 + epoch * len(data_loader) + i) ** args.anneal_index)
+              noise_coef = noise_coef ** 0.5
+            elif args.smoothing_type == 'tanh':
+              noise_coef = np.tanh(-args.tanh_scale*((epoch * len(data_loader) + i)/args.epochs/len(data_loader) -.5))
+            else: raise ValueError('Unknown smoothing-type')
+            if i % args.print_freq == 0:
+              logging.info('{phase} - Epoch: [{0}][{1}/{2}]\t'
+                           'Noise Coefficient: {noise_coef:.4f}\t'.format(
+                epoch, i, len(data_loader),
+                phase='TRAINING' if training else 'EVALUATING',
+                noise_coef=noise_coef))
+
             for k, mini_input_var in enumerate(mini_inputs):
 
                 noises = {}
@@ -328,9 +349,7 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 # randomly change current model @ each mini-mini-batch
                 for p in model.parameters():
                   #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
-                  anneal_coef = 1.0 / ((1 + epoch * len(data_loader) + i) ** args.anneal_index)
-                  anneal_coef = anneal_coef ** 0.5
-                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * anneal_coef
+                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
                   noises[noise_idx] = noise
                   noise_idx += 1
                   p.data.add_(noise)
