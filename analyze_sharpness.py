@@ -27,7 +27,11 @@ model_names = sorted(name for name in models.__dict__
                      and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ConvNet Training')
-
+parser.add_argument('--augment', dest='augment', action='store_true',
+                    help='data augment')
+parser.add_argument('--no-augment', dest='augment', action='store_false',
+                    help='data augment')
+parser.set_defaults(augment=False)
 parser.add_argument('--results_dir', metavar='RESULTS_DIR',
                     default='./TrainingResults', help='results dir')
 parser.add_argument('--save', metavar='SAVE', default='',
@@ -159,7 +163,7 @@ def main():
     # Data loading code
     default_transform = {
         'train': get_transform(args.dataset,
-                               input_size=args.input_size, augment=True),
+                               input_size=args.input_size, augment=args.augment),
         'eval': get_transform(args.dataset,
                               input_size=args.input_size, augment=False)
     }
