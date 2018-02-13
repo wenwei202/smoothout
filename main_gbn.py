@@ -65,6 +65,11 @@ parser.add_argument('--save_all', dest='save_all', action='store_true',
 parser.add_argument('--no-save_all', dest='save_all', action='store_false',
                     help='save all better checkpoints')
 parser.set_defaults(save_all=False)
+parser.add_argument('--augment', dest='augment', action='store_true',
+                    help='data augment')
+parser.add_argument('--no-augment', dest='augment', action='store_false',
+                    help='data augment')
+parser.set_defaults(augment=True)
 parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true',
                     help='regime fix for big batch e = e0*(batch_size/128)')
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
@@ -165,7 +170,7 @@ def main():
     # Data loading code
     default_transform = {
         'train': get_transform(args.dataset,
-                               input_size=args.input_size, augment=True),
+                               input_size=args.input_size, augment=args.augment),
         'eval': get_transform(args.dataset,
                               input_size=args.input_size, augment=False)
     }

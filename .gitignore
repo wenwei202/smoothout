@@ -1,4 +1,5 @@
 *.pyc
 TrainingResults
+pytorch-gen
 .idea
 *.pdf
