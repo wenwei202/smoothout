@@ -333,7 +333,8 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
               noise_coef = 1.0 / ((1 + epoch * len(data_loader) + i) ** args.anneal_index)
               noise_coef = noise_coef ** 0.5
             elif args.smoothing_type == 'tanh':
-              noise_coef = np.tanh(-args.tanh_scale*((epoch * len(data_loader) + i)/args.epochs/len(data_loader) -.5))
+              noise_coef = np.tanh(-args.tanh_scale*((float)(epoch * len(data_loader) + i)/(float)(args.epochs * len(data_loader)) -.5))
+              noise_coef = (noise_coef + 1.)/2.0
             else: raise ValueError('Unknown smoothing-type')
             if i % args.print_freq == 0:
               logging.info('{phase} - Epoch: [{0}][{1}/{2}]\t'
