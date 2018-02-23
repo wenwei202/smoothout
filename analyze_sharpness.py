@@ -149,6 +149,8 @@ def main():
                    args.slave_evaluate, slave_checkpoint['epoch'])
       alpha_str = args.alpha.split(':')
       alpha = np.arange(float(alpha_str[0]),float(alpha_str[2]),float(alpha_str[1]))
+    else:
+      raise ImportError("Please specify your slave model path.")
 
     # optionally resume from a checkpoint
     if args.evaluate:
@@ -157,8 +159,8 @@ def main():
         master_checkpoint = torch.load(args.evaluate, map_location=lambda storage, loc: storage)
         logging.info("loaded checkpoint '%s' (epoch %s)",
                      args.evaluate, master_checkpoint['epoch'])
-    elif args.resume:
-        raise NotImplementedError('resume disabled')
+    else:
+        raise ImportError("Please specify your master model path.")
 
     # Data loading code
     default_transform = {
@@ -168,18 +170,7 @@ def main():
                               input_size=args.input_size, augment=False)
     }
     transform = getattr(model, 'input_transform', default_transform)
-    regime = getattr(model, 'regime', {0: {'optimizer': args.optimizer,
-                                           'lr': args.lr,
-                                           'momentum': args.momentum,
-                                           'weight_decay': args.weight_decay}})
-    adapted_regime = {}
-    for e, v in regime.items():
-        if args.lr_bb_fix and 'lr' in v:
-            v['lr'] *= (args.batch_size / args.mini_batch_size) ** 0.5
-        if args.regime_bb_fix:
-            e *= ceil(args.batch_size / args.mini_batch_size)
-        adapted_regime[e] = v
-    regime = adapted_regime
+
     # define loss function (criterion) and optimizer
     criterion = getattr(model, 'criterion', nn.CrossEntropyLoss)()
     criterion.type(args.type)
@@ -261,77 +252,6 @@ def main():
         plt.show()
         print 'Done'
         return
-
-
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
-    logging.info('training regime: %s', regime)
-    print({i: list(w.size())
-           for (i, w) in enumerate(list(model.parameters()))})
-    init_weights = [w.data.cpu().clone() for w in list(model.parameters())]
-
-    for epoch in range(args.start_epoch, args.epochs):
-        optimizer = adjust_optimizer(optimizer, epoch, regime)
-
-        # train for one epoch
-        train_result = train(train_loader, model, criterion, epoch, optimizer)
-
-        train_loss, train_prec1, train_prec5 = [
-            train_result[r] for r in ['loss', 'prec1', 'prec5']]
-
-        # evaluate on validation set
-        val_result = validate(val_loader, model, criterion, epoch)
-        val_loss, val_prec1, val_prec5 = [val_result[r]
-                                          for r in ['loss', 'prec1', 'prec5']]
-
-        # remember best prec@1 and save checkpoint
-        is_best = val_prec1 > best_prec1
-        best_prec1 = max(val_prec1, best_prec1)
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'model': args.model,
-            'config': args.model_config,
-            'state_dict': model.state_dict(),
-            'best_prec1': best_prec1,
-            'regime': regime
-        }, is_best, path=save_path)
-        logging.info('\n Epoch: {0}\t'
-                     'Training Loss {train_loss:.4f} \t'
-                     'Training Prec@1 {train_prec1:.3f} \t'
-                     'Training Prec@5 {train_prec5:.3f} \t'
-                     'Validation Loss {val_loss:.4f} \t'
-                     'Validation Prec@1 {val_prec1:.3f} \t'
-                     'Validation Prec@5 {val_prec5:.3f} \n'
-                     .format(epoch + 1, train_loss=train_loss, val_loss=val_loss,
-                             train_prec1=train_prec1, val_prec1=val_prec1,
-                             train_prec5=train_prec5, val_prec5=val_prec5))
-
-        #Enable to measure more layers
-        idxs = [0]#,2,4,6,7,8,9,10]#[0, 12, 45, 63]
-
-        step_dist_epoch = {'step_dist_n%s' % k: (w.data.cpu() - init_weights[k]).norm()
-                           for (k, w) in enumerate(list(model.parameters())) if k in idxs}
-
-
-        results.add(epoch=epoch + 1, train_loss=train_loss, val_loss=val_loss,
-                    train_error1=100 - train_prec1, val_error1=100 - val_prec1,
-                    train_error5=100 - train_prec5, val_error5=100 - val_prec5,
-                    **step_dist_epoch)
-
-        results.plot(x='epoch', y=['train_loss', 'val_loss'],
-                     title='Loss', ylabel='loss')
-        results.plot(x='epoch', y=['train_error1', 'val_error1'],
-                     title='Error@1', ylabel='error %')
-        results.plot(x='epoch', y=['train_error5', 'val_error5'],
-                     title='Error@5', ylabel='error %')
-
-        for k in idxs:
-            results.plot(x='epoch', y=['step_dist_n%s' % k],
-                         title='step distance per epoch %s' % k,
-                         ylabel='val')
-
-        results.save()
-
 
 def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=None):
     if args.gpus and len(args.gpus) > 1:
