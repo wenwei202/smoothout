@@ -20,6 +20,7 @@ from ast import literal_eval
 from torch.nn.utils import clip_grad_norm
 from math import ceil
 import numpy as np
+import scipy.optimize as sciopt
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -52,9 +53,9 @@ parser.add_argument('--epochs', default=200, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=2048, type=int,
+parser.add_argument('-b', '--batch-size', default=1000, type=int,
                     metavar='N', help='mini-batch size (default: 2048)')
-parser.add_argument('-mb', '--mini-batch-size', default=128, type=int,
+parser.add_argument('-mb', '--mini-batch-size', default=100, type=int,
                     help='mini-mini-batch size (default: 128)')
 parser.add_argument('--lr_bb_fix', dest='lr_bb_fix', action='store_true',
                     help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
@@ -148,7 +149,7 @@ def main():
     if args.evaluate:
         if not os.path.isfile(args.evaluate):
             parser.error('invalid checkpoint: {}'.format(args.evaluate))
-        checkpoint = torch.load(args.evaluate)
+        checkpoint = torch.load(args.evaluate, map_location=lambda storage, loc: storage)
         model.load_state_dict(checkpoint['state_dict'])
         logging.info("loaded checkpoint '%s' (epoch %s)",
                      args.evaluate, checkpoint['epoch'])
@@ -187,6 +188,11 @@ def main():
                  .format(val_loss=val_loss,
                          val_prec1=val_prec1,
                          val_prec5=val_prec5))
+
+    sharpness = get_sharpness(val_loader, model, criterion)
+    logging.info('sharpness = {sharpness:.4f}'.format(sharpness=sharpness))
+
+
     return
 
 
@@ -194,13 +200,16 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
     if args.gpus and len(args.gpus) > 1:
         model = torch.nn.DataParallel(model, args.gpus)
 
-    batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
 
     end = time.time()
+    grad_vec = None
+    if training:
+      optimizer = torch.optim.SGD(model.parameters(), 1.0)
+      optimizer.zero_grad()  # only zerout at the beginning
 
 
     for i, (inputs, target) in enumerate(data_loader):
@@ -226,37 +235,7 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             mini_inputs = input_var.chunk(args.batch_size // args.mini_batch_size)
             mini_targets = target_var.chunk(args.batch_size // args.mini_batch_size)
 
-
-            optimizer.zero_grad()
-
-            # get the coefficent to scale noise
-            if args.smoothing_type == 'constant':
-              noise_coef = 1.
-            elif args.smoothing_type == 'anneal':
-              noise_coef = 1.0 / ((1 + epoch * len(data_loader) + i) ** args.anneal_index)
-              noise_coef = noise_coef ** 0.5
-            elif args.smoothing_type == 'tanh':
-              noise_coef = np.tanh(-args.tanh_scale*((float)(epoch * len(data_loader) + i)/(float)(args.epochs * len(data_loader)) -.5))
-              noise_coef = (noise_coef + 1.)/2.0
-            else: raise ValueError('Unknown smoothing-type')
-            if i % args.print_freq == 0:
-              logging.info('{phase} - Epoch: [{0}][{1}/{2}]\t'
-                           'Noise Coefficient: {noise_coef:.4f}\t'.format(
-                epoch, i, len(data_loader),
-                phase='TRAINING' if training else 'EVALUATING',
-                noise_coef=noise_coef))
-
             for k, mini_input_var in enumerate(mini_inputs):
-
-                noises = {}
-                noise_idx = 0
-                # randomly change current model @ each mini-mini-batch
-                for p in model.parameters():
-                  #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
-                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
-                  noises[noise_idx] = noise
-                  noise_idx += 1
-                  p.data.add_(noise)
 
                 mini_target_var = mini_targets[k]
                 output = model(mini_input_var)
@@ -270,51 +249,104 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 # compute gradient and do SGD step
                 loss.backward()
 
-                # denoise @ each mini-mini-batch. Do we need denoising???
-                noise_idx = 0
-                for p in model.parameters():
-                  p.data.sub_(noises[noise_idx])
-                  noise_idx += 1
-
             for p in model.parameters():
                 p.grad.data.div_(len(mini_inputs))
-            clip_grad_norm(model.parameters(), 5.)
-            optimizer.step()
+            #clip_grad_norm(model.parameters(), 5.)
+            #optimizer.step() # no step in this case
 
+    # reshape and averaging gradients
+    if training:
+      for p in model.parameters():
+        p.grad.data.div_(len(data_loader))
+        if grad_vec is None:
+          grad_vec = p.grad.data.view(-1)
+        else:
+          grad_vec = torch.cat((grad_vec, p.grad.data.view(-1)))
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % args.print_freq == 0:
-            logging.info('{phase} - Epoch: [{0}][{1}/{2}]\t'
-                         'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                         'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                         'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                         'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                             epoch, i, len(data_loader),
-                             phase='TRAINING' if training else 'EVALUATING',
-                             batch_time=batch_time,
-                             data_time=data_time, loss=losses, top1=top1, top5=top5))
+    #logging.info('{phase} - \t'
+    #             'Loss {loss.avg:.4f}\t'
+    #             'Prec@1 {top1.avg:.3f}\t'
+    #             'Prec@5 {top5.avg:.3f}'.format(
+    #              phase='TRAINING' if training else 'EVALUATING',
+    #              loss=losses, top1=top1, top5=top5))
 
     return {'loss': losses.avg,
             'prec1': top1.avg,
-            'prec5': top5.avg}
+            'prec5': top5.avg}, grad_vec
 
 
 def train(data_loader, model, criterion, epoch, optimizer):
     # switch to train mode
-    model.train()
-    return forward(data_loader, model, criterion, epoch,
-                   training=True, optimizer=optimizer)
+    raise NotImplementedError('train functionality is changed. Do not use it!')
 
 
 def validate(data_loader, model, criterion, epoch):
     # switch to evaluate mode
     model.eval()
-    return forward(data_loader, model, criterion, epoch,
+    res, _ = forward(data_loader, model, criterion, epoch,
                    training=False, optimizer=None)
+    return res
+
+
+def get_minus_cross_entropy(x, data_loader, model, criterion, training=False):
+  if type(x).__module__ == np.__name__:
+    x = torch.from_numpy(x).float()
+    x = x.cuda()
+  # switch to evaluate mode
+  model.eval()
+
+  # fill vector x of parameters to model
+  x_start = 0
+  for p in model.parameters():
+    psize = p.data.size()
+    peltnum = 1
+    for s in psize:
+      peltnum *= s
+    x_part = x[x_start:x_start+peltnum]
+    p.data = x_part.view(psize)
+    x_start += peltnum
+
+  result, grads = forward(data_loader, model, criterion, 0,
+                 training=training, optimizer=None)
+  #print ('get_minus_cross_entropy {}!'.format(-result['loss']))
+  return (-result['loss'], None if grads is None else grads.cpu().numpy().astype(np.float64))
+
+def get_sharpness(data_loader, model, criterion):
+
+  # extract current x0
+  x0 = None
+  for p in model.parameters():
+    if x0 is None:
+      x0 = p.data.view(-1)
+    else:
+      x0 = torch.cat((x0, p.data.view(-1)))
+  x0 = x0.cpu().numpy()
+
+  # get current f_x
+  f_x0, _ = get_minus_cross_entropy(x0, data_loader, model, criterion)
+  f_x0 = -f_x0
+  logging.info('min loss f_x0 = {loss:.4f}'.format(loss=f_x0))
+
+  # get the bounds
+  #bounds = np.tile((-1.0e-5,1.0e-5),(x0.shape[0],1))
+  epsilon = 1.0e-3
+  x_min = np.reshape(x0 - epsilon*(np.abs(x0)+1), (x0.shape[0],1))
+  x_max = np.reshape(x0 + epsilon * (np.abs(x0) + 1), (x0.shape[0], 1))
+  bounds = np.concatenate([x_min,x_max],1)
+  # find the minimum
+  func = lambda x: get_minus_cross_entropy(x, data_loader, model, criterion, training=True)
+  minimum_x, f_x, d = sciopt.fmin_l_bfgs_b(
+    func,
+    x0,
+    maxiter=10,
+    bounds=bounds,
+    #factr=10.,
+    #pgtol=1.e-12,
+    disp=1)
+  f_x = -f_x
+  logging.info('max loss f_x = {loss:.4f}'.format(loss=f_x))
+  sharpness = (f_x - f_x0)/(1+f_x0)*100
+  return sharpness
 
 
 if __name__ == '__main__':
