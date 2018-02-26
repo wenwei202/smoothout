@@ -21,6 +21,7 @@ from torch.nn.utils import clip_grad_norm
 from math import ceil
 import numpy as np
 import scipy.optimize as sciopt
+import warnings
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -57,11 +58,6 @@ parser.add_argument('-b', '--batch-size', default=1000, type=int,
                     metavar='N', help='mini-batch size (default: 2048)')
 parser.add_argument('-mb', '--mini-batch-size', default=100, type=int,
                     help='mini-mini-batch size (default: 128)')
-parser.add_argument('--lr_bb_fix', dest='lr_bb_fix', action='store_true',
-                    help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
-parser.add_argument('--no-lr_bb_fix', dest='lr_bb_fix', action='store_false',
-                    help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
-parser.set_defaults(lr_bb_fix=True)
 parser.add_argument('--save_all', dest='save_all', action='store_true',
                     help='save all better checkpoints')
 parser.add_argument('--no-save_all', dest='save_all', action='store_false',
@@ -72,11 +68,6 @@ parser.add_argument('--augment', dest='augment', action='store_true',
 parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='data augment')
 parser.set_defaults(augment=True)
-parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true',
-                    help='regime fix for big batch e = e0*(batch_size/128)')
-parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
-                    help='regime fix for big batch e = e0*(batch_size/128)')
-parser.set_defaults(regime_bb_fix=False)
 parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
                     help='optimizer function used')
 parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
@@ -99,15 +90,14 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='evaluate model FILE on validation set')
-
+parser.add_argument('--epsilon', default=0.0005, type=float,
+                    help='epsilon to contrain the box size for sharpness measure')
 
 def main():
     torch.manual_seed(123)
     global args, best_prec1
     best_prec1 = 0
     args = parser.parse_args()
-    if args.regime_bb_fix:
-            args.epochs *= (int)(ceil(args.batch_size / args.mini_batch_size))
 
     if args.evaluate:
         args.results_dir = '/tmp'
@@ -131,8 +121,15 @@ def main():
         args.gpus = [int(i) for i in args.gpus.split(',')]
         torch.cuda.set_device(args.gpus[0])
         cudnn.benchmark = True
+        if len(args.gpus) != 1:
+          raise NotImplementedError('Please use one gpu.')
     else:
         args.gpus = None
+
+    if args.batch_size != args.mini_batch_size:
+      args.mini_batch_size = args.batch_size
+      warnings.warn('--mini-batch-size is enforced to be set as --batch-size {}'.format(args.mini_batch_size),
+                    RuntimeWarning)
 
     # create model
     logging.info("creating model %s", args.model)
@@ -154,7 +151,7 @@ def main():
         logging.info("loaded checkpoint '%s' (epoch %s)",
                      args.evaluate, checkpoint['epoch'])
     else:
-      raise ImportError("Please specify the path of evaluated model")
+      raise ValueError("Please specify the path of evaluated model")
 
     num_parameters = sum([l.nelement() for l in model.parameters()])
     logging.info("number of parameters: %d", num_parameters)
@@ -249,9 +246,6 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 # compute gradient and do SGD step
                 loss.backward()
 
-            for p in model.parameters():
-                p.grad.data.div_(len(mini_inputs))
-            #clip_grad_norm(model.parameters(), 5.)
             #optimizer.step() # no step in this case
 
     # reshape and averaging gradients
@@ -329,7 +323,7 @@ def get_sharpness(data_loader, model, criterion):
 
   # get the bounds
   #bounds = np.tile((-1.0e-5,1.0e-5),(x0.shape[0],1))
-  epsilon = 1.0e-3
+  epsilon = args.epsilon
   x_min = np.reshape(x0 - epsilon*(np.abs(x0)+1), (x0.shape[0],1))
   x_max = np.reshape(x0 + epsilon * (np.abs(x0) + 1), (x0.shape[0], 1))
   bounds = np.concatenate([x_min,x_max],1)
