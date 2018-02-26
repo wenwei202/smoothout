@@ -1,0 +1,17 @@
+#!/bin/bash
+#set -e
+#set -x
+if [ "$#" -lt 1 ]; then
+	echo "Illegal number of parameters"
+	echo "Usage: ${0##*/} config_file"
+	exit
+fi
+
+while read config; do
+    IFS=', ' read -r -a array <<< "${config}"
+    dataset=${array[0]}
+    model=${array[1]}
+    path=${array[2]}
+    echo "Measuring ${dataset} ${model} ${path}"
+    python measure_sharpness.py --model ${model} --dataset ${dataset} --b 1000 --gpus 1  --evaluate ${path}/model_best.pth.tar
+done <$1
