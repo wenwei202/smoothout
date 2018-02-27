@@ -347,7 +347,7 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
       floss, fg = get_minus_cross_entropy(x0 + np.dot(A, y), data_loader, model, criterion, training=True)
       return floss, np.dot(np.transpose(A), fg)
     #func = lambda y: get_minus_cross_entropy(x0+np.dot(A, y), data_loader, model, criterion, training=True)
-    init_guess = np.zeros(args.manifolds)
+    init_guess = np.zeros(manifolds)
 
   minimum_x, f_x, d = sciopt.fmin_l_bfgs_b(
     func,
