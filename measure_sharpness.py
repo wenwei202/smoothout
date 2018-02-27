@@ -92,7 +92,10 @@ parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='evaluate model FILE on validation set')
 parser.add_argument('--epsilon', default=0.0005, type=float,
                     help='epsilon to contrain the box size for sharpness measure')
-
+parser.add_argument('-m', '--manifolds', default=100, type=int, metavar='M',
+                    help='The dimensionality of manifolds to measure sharpness. (0: full-space)')
+parser.add_argument('-t', '--times', default=10, type=int, metavar='T',
+                    help='Times to average over for sharpness')
 def main():
     torch.manual_seed(123)
     global args, best_prec1
@@ -186,7 +189,7 @@ def main():
                          val_prec1=val_prec1,
                          val_prec5=val_prec5))
 
-    sharpness = get_sharpness(val_loader, model, criterion)
+    sharpness = get_sharpness(val_loader, model, criterion, manifolds=args.manifolds)
     logging.info('sharpness = {sharpness:.4f}'.format(sharpness=sharpness))
 
 
@@ -305,7 +308,7 @@ def get_minus_cross_entropy(x, data_loader, model, criterion, training=False):
   #print ('get_minus_cross_entropy {}!'.format(-result['loss']))
   return (-result['loss'], None if grads is None else grads.cpu().numpy().astype(np.float64))
 
-def get_sharpness(data_loader, model, criterion):
+def get_sharpness(data_loader, model, criterion, manifolds=0):
 
   # extract current x0
   x0 = None
@@ -322,16 +325,33 @@ def get_sharpness(data_loader, model, criterion):
   logging.info('min loss f_x0 = {loss:.4f}'.format(loss=f_x0))
 
   # get the bounds
-  #bounds = np.tile((-1.0e-5,1.0e-5),(x0.shape[0],1))
   epsilon = args.epsilon
-  x_min = np.reshape(x0 - epsilon*(np.abs(x0)+1), (x0.shape[0],1))
-  x_max = np.reshape(x0 + epsilon * (np.abs(x0) + 1), (x0.shape[0], 1))
-  bounds = np.concatenate([x_min,x_max],1)
   # find the minimum
-  func = lambda x: get_minus_cross_entropy(x, data_loader, model, criterion, training=True)
+  if 0==manifolds:
+    x_min = np.reshape(x0 - epsilon * (np.abs(x0) + 1), (x0.shape[0], 1))
+    x_max = np.reshape(x0 + epsilon * (np.abs(x0) + 1), (x0.shape[0], 1))
+    bounds = np.concatenate([x_min, x_max], 1)
+    func = lambda x: get_minus_cross_entropy(x, data_loader, model, criterion, training=True)
+    init_guess = x0
+  else:
+    assert(manifolds<=x0.shape[0])
+    A = np.random.rand(x0.shape[0], manifolds)
+    # normalize each column to unit length
+    A_norm = np.linalg.norm(A, axis=0)
+    A = A / A_norm
+    A_plus = np.linalg.pinv(A)
+    abs_bound = epsilon * (np.abs(np.dot(A_plus, x0))+1)
+    abs_bound = np.reshape(abs_bound, (abs_bound.shape[0], 1))
+    bounds = np.concatenate([-abs_bound, abs_bound], 1)
+    def func(y):
+      floss, fg = get_minus_cross_entropy(x0 + np.dot(A, y), data_loader, model, criterion, training=True)
+      return floss, np.dot(np.transpose(A), fg)
+    #func = lambda y: get_minus_cross_entropy(x0+np.dot(A, y), data_loader, model, criterion, training=True)
+    init_guess = np.zeros(args.manifolds)
+
   minimum_x, f_x, d = sciopt.fmin_l_bfgs_b(
     func,
-    x0,
+    init_guess,
     maxiter=10,
     bounds=bounds,
     #factr=10.,
