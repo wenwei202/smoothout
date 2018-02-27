@@ -22,6 +22,7 @@ from math import ceil
 import numpy as np
 import scipy.optimize as sciopt
 import warnings
+from sklearn import random_projection as rp
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -92,7 +93,7 @@ parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='evaluate model FILE on validation set')
 parser.add_argument('--epsilon', default=0.0005, type=float,
                     help='epsilon to contrain the box size for sharpness measure')
-parser.add_argument('-m', '--manifolds', default=100, type=int, metavar='M',
+parser.add_argument('-m', '--manifolds', default=0, type=int, metavar='M',
                     help='The dimensionality of manifolds to measure sharpness. (0: full-space)')
 parser.add_argument('-t', '--times', default=10, type=int, metavar='T',
                     help='Times to average over for sharpness')
@@ -334,12 +335,17 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
     func = lambda x: get_minus_cross_entropy(x, data_loader, model, criterion, training=True)
     init_guess = x0
   else:
+    warnings.warn("Small manifolds may not be able to explore the space.")
     assert(manifolds<=x0.shape[0])
-    A = np.random.rand(x0.shape[0], manifolds)
+    #transformer = rp.GaussianRandomProjection(n_components=manifolds)
+    #transformer.fit(np.random.rand(manifolds, x0.shape[0]))
+    #A_plus = transformer.components_
+    #A = np.linalg.pinv(A_plus)
+    A_plus = np.random.rand(manifolds, x0.shape[0])*2.-1.
     # normalize each column to unit length
-    A_norm = np.linalg.norm(A, axis=0)
-    A = A / A_norm
-    A_plus = np.linalg.pinv(A)
+    A_plus_norm = np.linalg.norm(A_plus, axis=1)
+    A_plus = A_plus / np.reshape(A_plus_norm, (manifolds,1))
+    A = np.linalg.pinv(A_plus)
     abs_bound = epsilon * (np.abs(np.dot(A_plus, x0))+1)
     abs_bound = np.reshape(abs_bound, (abs_bound.shape[0], 1))
     bounds = np.concatenate([-abs_bound, abs_bound], 1)
