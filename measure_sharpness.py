@@ -91,11 +91,11 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='evaluate model FILE on validation set')
-parser.add_argument('--epsilon', default=0.0005, type=float,
+parser.add_argument('--epsilon', default=0.001, type=float,
                     help='epsilon to contrain the box size for sharpness measure')
 parser.add_argument('-m', '--manifolds', default=0, type=int, metavar='M',
                     help='The dimensionality of manifolds to measure sharpness. (0: full-space)')
-parser.add_argument('-t', '--times', default=10, type=int, metavar='T',
+parser.add_argument('-t', '--times', default=5, type=int, metavar='T',
                     help='Times to average over for sharpness')
 def main():
     torch.manual_seed(123)
@@ -189,10 +189,15 @@ def main():
                  .format(val_loss=val_loss,
                          val_prec1=val_prec1,
                          val_prec5=val_prec5))
-
-    sharpness = get_sharpness(val_loader, model, criterion, manifolds=args.manifolds)
-    logging.info('sharpness = {sharpness:.4f}'.format(sharpness=sharpness))
-
+    sharpnesses= []
+    for time in range(args.times):
+        sharpness = get_sharpness(val_loader, model, criterion, manifolds=args.manifolds)
+        sharpnesses.append(sharpness)
+        logging.info('sharpness {} = {}'.format(time,sharpness))
+    logging.info('sharpnesses = {}'.format(str(sharpnesses)))
+    _std = np.std(sharpnesses)*np.sqrt(args.times)/np.sqrt(args.times-1)
+    _mean = np.mean(sharpnesses)
+    logging.info(u'mean sharpness = {sharpness:.4f}\u00b1{err:.4f}'.format(sharpness=_mean,err=_std))
 
     return
 
@@ -333,7 +338,7 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
     x_max = np.reshape(x0 + epsilon * (np.abs(x0) + 1), (x0.shape[0], 1))
     bounds = np.concatenate([x_min, x_max], 1)
     func = lambda x: get_minus_cross_entropy(x, data_loader, model, criterion, training=True)
-    init_guess = x0
+    #init_guess = x0
   else:
     warnings.warn("Small manifolds may not be able to explore the space.")
     assert(manifolds<=x0.shape[0])
@@ -353,7 +358,11 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
       floss, fg = get_minus_cross_entropy(x0 + np.dot(A, y), data_loader, model, criterion, training=True)
       return floss, np.dot(np.transpose(A), fg)
     #func = lambda y: get_minus_cross_entropy(x0+np.dot(A, y), data_loader, model, criterion, training=True)
-    init_guess = np.zeros(manifolds)
+    #init_guess = np.zeros(manifolds)
+
+  #
+  rand_selections = (np.random.rand(bounds.shape[0])+1e-6)*0.99
+  init_guess = np.multiply(1.-rand_selections, bounds[:,0])+np.multiply(rand_selections, bounds[:,1])
 
   minimum_x, f_x, d = sciopt.fmin_l_bfgs_b(
     func,
@@ -366,6 +375,20 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
   f_x = -f_x
   logging.info('max loss f_x = {loss:.4f}'.format(loss=f_x))
   sharpness = (f_x - f_x0)/(1+f_x0)*100
+
+  # recover the model
+  x0 = torch.from_numpy(x0).float()
+  x0 = x0.cuda()
+  x_start = 0
+  for p in model.parameters():
+      psize = p.data.size()
+      peltnum = 1
+      for s in psize:
+          peltnum *= s
+      x_part = x0[x_start:x_start + peltnum]
+      p.data = x_part.view(psize)
+      x_start += peltnum
+
   return sharpness
 
 
