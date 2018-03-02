@@ -18,7 +18,13 @@ It is based off [convNet.pytorch](https://github.com/eladhoffer/convNet.pytorch)
 
 ## Data
 - Configure your dataset path at **data.py**.
-- To get the ILSVRC data, you should register on their site for access: <http://www.image-net.org/>
+- To get the ILSVRC data, you should register on their site for access: <http://www.image-net.org/> and
+```
+mkdir -p pytorch-gen/imagenet
+cd pytorch-gen/imagenet
+ln -s ${YOUR_IMAGENET_PATH}/train/ train
+ln -s ${YOUR_IMAGENET_PATH}/validation/ val
+```
 
 ## Experiment examples
 ```bash
