@@ -91,7 +91,7 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='evaluate model FILE on validation set')
-parser.add_argument('--epsilon', default=0.001, type=float,
+parser.add_argument('--epsilon', default=0.0005, type=float,
                     help='epsilon to contrain the box size for sharpness measure')
 parser.add_argument('-m', '--manifolds', default=0, type=int, metavar='M',
                     help='The dimensionality of manifolds to measure sharpness. (0: full-space)')
@@ -360,8 +360,8 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
     #func = lambda y: get_minus_cross_entropy(x0+np.dot(A, y), data_loader, model, criterion, training=True)
     #init_guess = np.zeros(manifolds)
 
-  #
   rand_selections = (np.random.rand(bounds.shape[0])+1e-6)*0.99
+  #rand_selections = ((np.random.rand(bounds.shape[0])>0.5).astype(float))*0.9+.05
   init_guess = np.multiply(1.-rand_selections, bounds[:,0])+np.multiply(rand_selections, bounds[:,1])
 
   minimum_x, f_x, d = sciopt.fmin_l_bfgs_b(
