@@ -7,11 +7,14 @@ cifar100 resnet TrainingResults/2018-02-20_20-20-19/
 cifar100 resnet TrainingResults/2018-02-20_20-21-08/
 cifar100 resnet TrainingResults/2018-02-20_20-26-14/
 cifar10 cifar10_shallow TrainingResults/2018-02-20_14-15-40/
+cifar10 cifar10_shallow TrainingResults/2018-03-01_13-54-46/
 cifar10 cifar10_shallow TrainingResults/2018-02-20_14-16-05/
 cifar10 cifar10_shallow TrainingResults/2018-02-20_14-16-40/
 cifar100 cifar100_shallow TrainingResults/2018-02-20_14-06-40/
+cifar100 cifar100_shallow TrainingResults/2018-03-01_13-53-11/
 cifar100 cifar100_shallow TrainingResults/2018-02-20_14-05-28/
 cifar100 cifar100_shallow TrainingResults/2018-02-20_14-05-44/
 mnist mnist_f1 TrainingResults/2018-02-20_13-54-35/
+mnist mnist_f1 TrainingResults/2018-03-01_13-50-30/
 mnist mnist_f1 TrainingResults/2018-02-20_13-55-00/
 mnist mnist_f1 TrainingResults/2018-02-20_13-55-14/
