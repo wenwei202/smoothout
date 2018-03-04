@@ -310,7 +310,6 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
     end = time.time()
 
-
     for i, (inputs, target) in enumerate(data_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -359,12 +358,13 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 noises = {}
                 noise_idx = 0
                 # randomly change current model @ each mini-mini-batch
-                for p in model.parameters():
-                  #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
-                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
-                  noises[noise_idx] = noise
-                  noise_idx += 1
-                  p.data.add_(noise)
+                if args.sharpness_smoothing:
+                    for p in model.parameters():
+                      #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
+                      noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
+                      noises[noise_idx] = noise
+                      noise_idx += 1
+                      p.data.add_(noise)
 
                 mini_target_var = mini_targets[k]
                 output = model(mini_input_var)
@@ -380,9 +380,10 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
                 # denoise @ each mini-mini-batch. Do we need denoising???
                 noise_idx = 0
-                for p in model.parameters():
-                  p.data.sub_(noises[noise_idx])
-                  noise_idx += 1
+                if args.sharpness_smoothing:
+                    for p in model.parameters():
+                      p.data.sub_(noises[noise_idx])
+                      noise_idx += 1
 
             for p in model.parameters():
                 p.grad.data.div_(len(mini_inputs))
