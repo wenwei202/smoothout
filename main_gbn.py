@@ -90,8 +90,8 @@ parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
                     metavar='AI', help='Annealing index of noise (default: 0.55)')
 parser.add_argument('--tanh-scale', '--ts', default=10., type=float,
                     metavar='TS', help='scale of transition in tanh')
-parser.add_argument('--smoothing-type', default='tanh', type=str, metavar='ST',
-                    help='The type of chaning smoothing noise: constant, anneal, or tanh')
+parser.add_argument('--smoothing-type', default='constant', type=str, metavar='ST',
+                    help='The type of chaning smoothing noise: constant, anneal, tanh or adaptive')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -344,6 +344,8 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             elif args.smoothing_type == 'tanh':
               noise_coef = np.tanh(-args.tanh_scale*((float)(epoch * len(data_loader) + i//args.batch_multiplier)/(float)(args.epochs * len(data_loader)) -.5))
               noise_coef = (noise_coef + 1.)/2.0
+            elif args.smoothing_type == 'adaptive':
+                noise_coef = -1.0
             else: raise ValueError('Unknown smoothing-type')
             if i % args.print_freq == 0:
               logging.info('{phase} - Epoch: [{0}][{1}/{2}]\t'
@@ -359,6 +361,8 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 # randomly change current model @ each mini-mini-batch
                 if args.sharpness_smoothing:
                     for p in model.parameters():
+                      if args.smoothing_type == 'adaptive':
+                          noise_coef = p.std().data
                       #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
                       noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
                       noises[noise_idx] = noise
