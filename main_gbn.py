@@ -57,9 +57,9 @@ parser.add_argument('-b', '--batch-size', default=2048, type=int,
 parser.add_argument('-mb', '--mini-batch-size', default=128, type=int,
                     help='mini-mini-batch size (default: 128)')
 parser.add_argument('--lr_bb_fix', dest='lr_bb_fix', action='store_true',
-                    help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
+                    help='learning rate fix for big batch lr =  lr0*(batch_size*batch_multiplier/128)**0.5')
 parser.add_argument('--no-lr_bb_fix', dest='lr_bb_fix', action='store_false',
-                    help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
+                    help='learning rate fix for big batch lr =  lr0*(batch_size*batch_multiplier/128)**0.5')
 parser.set_defaults(lr_bb_fix=True)
 parser.add_argument('--save_all', dest='save_all', action='store_true',
                     help='save all better checkpoints')
@@ -72,9 +72,9 @@ parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='data augment')
 parser.set_defaults(augment=True)
 parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true',
-                    help='regime fix for big batch e = e0*(batch_size/128)')
+                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/128)')
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
-                    help='regime fix for big batch e = e0*(batch_size/128)')
+                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/128)')
 parser.set_defaults(regime_bb_fix=False)
 parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
                     help='optimizer function used')
@@ -98,7 +98,8 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
                     help='evaluate model FILE on validation set')
-
+parser.add_argument('--batch-multiplier', '-bm', default=1, type=int,
+                    metavar='BM', help='The number of batchs to delay parameter updating (default: 1). Used for very large-batch training using limited memory')
 
 def main():
     torch.manual_seed(123)
@@ -106,7 +107,7 @@ def main():
     best_prec1 = 0
     args = parser.parse_args()
     if args.regime_bb_fix:
-            args.epochs *= (int)(ceil(args.batch_size / args.mini_batch_size))
+            args.epochs *= (int)(ceil(args.batch_size*args.batch_multiplier / args.mini_batch_size))
 
     if args.evaluate:
         args.results_dir = '/tmp'
@@ -123,7 +124,7 @@ def main():
     results = ResultsLog(results_file % 'csv', results_file % 'html')
 
     logging.info("saving to %s", save_path)
-    logging.debug("run arguments: %s", args)
+    logging.info("run arguments: %s", args)
 
     worker_number = 1
     if 'cuda' in args.type:
@@ -194,9 +195,9 @@ def main():
     adapted_regime = {}
     for e, v in regime.items():
         if args.lr_bb_fix and 'lr' in v:
-            v['lr'] *= (args.batch_size / args.mini_batch_size) ** 0.5
+            v['lr'] *= (args.batch_size*args.batch_multiplier / args.mini_batch_size) ** 0.5
         if args.regime_bb_fix:
-            e *= ceil(args.batch_size / args.mini_batch_size)
+            e *= ceil(args.batch_size*args.batch_multiplier / args.mini_batch_size)
         adapted_regime[e] = v
     regime = adapted_regime
 
@@ -310,6 +311,9 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
     end = time.time()
 
+    if training:
+        optimizer.zero_grad()
+
     for i, (inputs, target) in enumerate(data_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -330,20 +334,19 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             top5.update(prec5[0], input_var.size(0))
 
         else:
+            is_updating = ((i+1)%args.batch_multiplier == 0) or (i+1==len(data_loader))
             mini_inputs = input_var.chunk(args.batch_size // args.mini_batch_size)
             mini_targets = target_var.chunk(args.batch_size // args.mini_batch_size)
 
-
-            optimizer.zero_grad()
 
             # get the coefficent to scale noise
             if args.smoothing_type == 'constant':
               noise_coef = 1.
             elif args.smoothing_type == 'anneal':
-              noise_coef = 1.0 / ((1 + epoch * len(data_loader) + i) ** args.anneal_index)
+              noise_coef = 1.0 / ((1 + epoch * len(data_loader) + i//args.batch_multiplier) ** args.anneal_index)
               noise_coef = noise_coef ** 0.5
             elif args.smoothing_type == 'tanh':
-              noise_coef = np.tanh(-args.tanh_scale*((float)(epoch * len(data_loader) + i)/(float)(args.epochs * len(data_loader)) -.5))
+              noise_coef = np.tanh(-args.tanh_scale*((float)(epoch * len(data_loader) + i//args.batch_multiplier)/(float)(args.epochs * len(data_loader)) -.5))
               noise_coef = (noise_coef + 1.)/2.0
             else: raise ValueError('Unknown smoothing-type')
             if i % args.print_freq == 0:
@@ -385,10 +388,15 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                       p.data.sub_(noises[noise_idx])
                       noise_idx += 1
 
-            for p in model.parameters():
-                p.grad.data.div_(len(mini_inputs))
-            clip_grad_norm(model.parameters(), 5.)
-            optimizer.step()
+            if is_updating:
+              n_batches = args.batch_multiplier
+              if (i+1) == len(data_loader):
+                  n_batches = (i % args.batch_multiplier) + 1
+              for p in model.parameters():
+                  p.grad.data.div_(len(mini_inputs)*n_batches)
+              clip_grad_norm(model.parameters(), 5.)
+              optimizer.step()
+              optimizer.zero_grad()
 
 
         # measure elapsed time
