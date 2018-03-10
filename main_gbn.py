@@ -126,11 +126,9 @@ def main():
     logging.info("saving to %s", save_path)
     logging.info("run arguments: %s", args)
 
-    worker_number = 1
     if 'cuda' in args.type:
         torch.cuda.manual_seed(123)
         args.gpus = [int(i) for i in args.gpus.split(',')]
-        worker_number = len(args.gpus)
         torch.cuda.set_device(args.gpus[0])
         cudnn.benchmark = True
     else:
@@ -204,8 +202,6 @@ def main():
     # adjust lr based on the number of gpus
     adapted_regime = {}
     for e, v in regime.items():
-        if worker_number>1 and 'lr' in v:
-            v['lr'] /= (float)(worker_number)
         adapted_regime[e] = v
     regime = adapted_regime
 
@@ -393,7 +389,7 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
               if (i+1) == len(data_loader):
                   n_batches = (i % args.batch_multiplier) + 1
               for p in model.parameters():
-                  p.grad.data.div_(len(mini_inputs)*n_batches)
+                  p.grad.data.div_(len(mini_inputs)*n_batches*len(args.gpus))
               clip_grad_norm(model.parameters(), 5.)
               optimizer.step()
               optimizer.zero_grad()
