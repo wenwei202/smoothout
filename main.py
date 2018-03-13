@@ -55,7 +55,8 @@ parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='gloo', type=str,
                     help='distributed backend')
-
+parser.add_argument('--gpus', default='0',
+                    help='gpus used for training - e.g 0,1,2,3')
 best_prec1 = 0
 
 
@@ -78,11 +79,12 @@ def main():
         model = models.__dict__[args.arch]()
 
     if not args.distributed:
+        args.gpus = [int(i) for i in args.gpus.split(',')]
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
-            model.features = torch.nn.DataParallel(model.features)
+            model.features = torch.nn.DataParallel(model.features, args.gpus)
             model.cuda()
         else:
-            model = torch.nn.DataParallel(model).cuda()
+            model = torch.nn.DataParallel(model, args.gpus).cuda()
     else:
         model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(model)
@@ -203,6 +205,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
+        if not args.distributed:
+            for p in model.parameters():
+                p.grad.data.div_(len(args.gpus))
         optimizer.step()
 
         # measure elapsed time
