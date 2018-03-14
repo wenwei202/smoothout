@@ -199,11 +199,6 @@ def main():
         adapted_regime[e] = v
     regime = adapted_regime
 
-    # adjust lr based on the number of gpus
-    adapted_regime = {}
-    for e, v in regime.items():
-        adapted_regime[e] = v
-    regime = adapted_regime
 
     # define loss function (criterion) and optimizer
     criterion = getattr(model, 'criterion', nn.CrossEntropyLoss)()

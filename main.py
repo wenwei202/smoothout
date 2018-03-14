@@ -80,12 +80,11 @@ def main():
 
     if not args.distributed:
         args.gpus = [int(i) for i in args.gpus.split(',')]
-        #if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
-        #    model.features = torch.nn.DataParallel(model.features, args.gpus)
-        #    model.cuda()
-        #else:
-        #    model = torch.nn.DataParallel(model, args.gpus).cuda()
-        model = torch.nn.DataParallel(model, args.gpus).cuda()
+        if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
+            model.features = torch.nn.DataParallel(model.features, args.gpus)
+            model.cuda()
+        else:
+            model = torch.nn.DataParallel(model, args.gpus).cuda()
     else:
         model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(model)
@@ -206,9 +205,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
-        if not args.distributed:
-            for p in model.parameters():
-                p.grad.data.div_(len(args.gpus))
         optimizer.step()
 
         # measure elapsed time
