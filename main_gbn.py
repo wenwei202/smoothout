@@ -102,7 +102,7 @@ parser.add_argument('--batch-multiplier', '-bm', default=1, type=int,
                     metavar='BM', help='The number of batchs to delay parameter updating (default: 1). Used for very large-batch training using limited memory')
 
 def main():
-    torch.manual_seed(123)
+    #torch.manual_seed(123)
     global args, best_prec1
     best_prec1 = 0
     args = parser.parse_args()
@@ -127,7 +127,7 @@ def main():
     logging.info("run arguments: %s", args)
 
     if 'cuda' in args.type:
-        torch.cuda.manual_seed(123)
+        #torch.cuda.manual_seed_all(123)
         args.gpus = [int(i) for i in args.gpus.split(',')]
         torch.cuda.set_device(args.gpus[0])
         cudnn.benchmark = True
@@ -389,7 +389,7 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
               if (i+1) == len(data_loader):
                   n_batches = (i % args.batch_multiplier) + 1
               for p in model.parameters():
-                  p.grad.data.div_(len(mini_inputs)*n_batches*len(args.gpus))
+                  p.grad.data.div_(len(mini_inputs)*n_batches)
               clip_grad_norm(model.parameters(), 5.)
               optimizer.step()
               optimizer.zero_grad()

@@ -98,7 +98,7 @@ parser.add_argument('-m', '--manifolds', default=0, type=int, metavar='M',
 parser.add_argument('-t', '--times', default=5, type=int, metavar='T',
                     help='Times to average over for sharpness')
 def main():
-    torch.manual_seed(123)
+    #torch.manual_seed(123)
     global args, best_prec1
     best_prec1 = 0
     args = parser.parse_args()
@@ -121,7 +121,7 @@ def main():
     logging.debug("run arguments: %s", args)
 
     if 'cuda' in args.type:
-        torch.cuda.manual_seed(123)
+        #torch.cuda.manual_seed_all(123)
         args.gpus = [int(i) for i in args.gpus.split(',')]
         torch.cuda.set_device(args.gpus[0])
         cudnn.benchmark = True
