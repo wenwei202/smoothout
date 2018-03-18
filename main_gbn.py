@@ -338,7 +338,7 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
               noise_coef = 1.0 / ((1 + epoch * eq_batch_num + i//args.batch_multiplier) ** args.anneal_index)
               noise_coef = noise_coef ** 0.5
             elif args.smoothing_type == 'tanh':
-              noise_coef = np.tanh(-args.tanh_scale*((float)(epoch * eq_batch_num + i//args.batch_multiplier)/(float)(args.epochs * eq_batch_num) -.5))
+              noise_coef = np.tanh(args.tanh_scale*((float)(epoch * eq_batch_num + i//args.batch_multiplier)/(float)(args.epochs * eq_batch_num) -.5))
               noise_coef = (noise_coef + 1.)/2.0
             elif args.smoothing_type == 'adaptive':
                 noise_coef = -1.0
