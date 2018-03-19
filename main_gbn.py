@@ -244,6 +244,11 @@ def main():
         # remember best prec@1 and save checkpoint
         is_best = val_prec1 > best_prec1
         best_prec1 = max(val_prec1, best_prec1)
+        if is_best:
+            logging.info('\n Epoch: {0}\t'
+                         'Best Val Prec@1 {val_prec1:.3f} '
+                         'with Val Prec@5 {val_prec5:.3f} \n'
+                         .format(epoch + 1, val_prec1=val_prec1, val_prec5=val_prec5))
         save_checkpoint({
             'epoch': epoch + 1,
             'model': args.model,
