@@ -95,7 +95,7 @@ parser.add_argument('--epsilon', default=0.0005, type=float,
                     help='epsilon to contrain the box size for sharpness measure')
 parser.add_argument('-m', '--manifolds', default=0, type=int, metavar='M',
                     help='The dimensionality of manifolds to measure sharpness. (0: full-space)')
-parser.add_argument('-t', '--times', default=5, type=int, metavar='T',
+parser.add_argument('-t', '--times', default=1, type=int, metavar='T',
                     help='Times to average over for sharpness')
 def main():
     #torch.manual_seed(123)
@@ -338,7 +338,7 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
     x_max = np.reshape(x0 + epsilon * (np.abs(x0) + 1), (x0.shape[0], 1))
     bounds = np.concatenate([x_min, x_max], 1)
     func = lambda x: get_minus_cross_entropy(x, data_loader, model, criterion, training=True)
-    #init_guess = x0
+    init_guess = x0
   else:
     warnings.warn("Small manifolds may not be able to explore the space.")
     assert(manifolds<=x0.shape[0])
@@ -358,11 +358,10 @@ def get_sharpness(data_loader, model, criterion, manifolds=0):
       floss, fg = get_minus_cross_entropy(x0 + np.dot(A, y), data_loader, model, criterion, training=True)
       return floss, np.dot(np.transpose(A), fg)
     #func = lambda y: get_minus_cross_entropy(x0+np.dot(A, y), data_loader, model, criterion, training=True)
-    #init_guess = np.zeros(manifolds)
+    init_guess = np.zeros(manifolds)
 
-  rand_selections = (np.random.rand(bounds.shape[0])+1e-6)*0.99
-  #rand_selections = ((np.random.rand(bounds.shape[0])>0.5).astype(float))*0.9+.05
-  init_guess = np.multiply(1.-rand_selections, bounds[:,0])+np.multiply(rand_selections, bounds[:,1])
+  #rand_selections = (np.random.rand(bounds.shape[0])+1e-6)*0.99
+  #init_guess = np.multiply(1.-rand_selections, bounds[:,0])+np.multiply(rand_selections, bounds[:,1])
 
   minimum_x, f_x, d = sciopt.fmin_l_bfgs_b(
     func,
