@@ -13,6 +13,6 @@ while read config; do
     model=${array[1]}
     path=${array[2]}
     echo "Measuring ${dataset} ${model} ${path}"
-    python measure_sharpness.py --model ${model} --dataset ${dataset} --b 1000 --gpus 0  --evaluate ${path}/model_best.pth.tar
+    python measure_sharpness.py --model ${model} --dataset ${dataset} --b 100 --gpus 0  --evaluate ${path}/model_best.pth.tar
     echo "-------------------------------------------------------------------"
 done <$1
