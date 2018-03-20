@@ -71,6 +71,6 @@ class AlexNetOWT_BN(nn.Module):
         return x
 
 
-def alexnet(**kwargs):
+def alexnetv2(**kwargs):
     num_classes = getattr(kwargs, 'num_classes', 1000)
     return AlexNetOWT_BN(num_classes)
