@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torchvision.transforms as transforms
 
-__all__ = ['alexnet']
+__all__ = ['alexnetv2']
 
 class AlexNetOWT_BN(nn.Module):
 
@@ -46,6 +46,32 @@ class AlexNetOWT_BN(nn.Module):
             20: {'lr': 1e-3},
             40: {'lr': 1e-4}
         }
+        self.quiet_parameters = [
+             'features.0.weight',
+             'features.2.weight',
+             'features.2.bias',
+             'features.4.weight',
+             'features.7.weight',
+             'features.7.bias',
+             'features.8.weight',
+             'features.10.weight',
+             'features.10.bias',
+             'features.11.weight',
+             'features.13.weight',
+             'features.13.bias',
+             'features.14.weight',
+             'features.17.weight',
+             'features.17.bias',
+             #'classifier.0.weight',
+             'classifier.1.weight',
+             'classifier.1.bias',
+             #'classifier.4.weight',
+             'classifier.5.weight',
+             'classifier.5.bias',
+             #'classifier.8.weight',
+             'classifier.8.bias',
+             ]
+
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
         self.input_transform = {
