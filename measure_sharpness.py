@@ -23,6 +23,8 @@ import numpy as np
 import scipy.optimize as sciopt
 import warnings
 from sklearn import random_projection as rp
+import re
+import matplotlib.pyplot as plt
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -179,6 +181,13 @@ def main():
         val_data,
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
+
+    for k in model.state_dict():
+        if re.match('.*weight.*', k):
+            plt.figure()
+            plt.hist(model.state_dict()[k].cpu().numpy().reshape(-1), bins='auto')
+            plt.title(k)
+    plt.show()
 
     val_result = validate(val_loader, model, criterion, 0)
     val_loss, val_prec1, val_prec5 = [val_result[r]
