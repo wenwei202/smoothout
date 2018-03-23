@@ -358,16 +358,15 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             for k, mini_input_var in enumerate(mini_inputs):
 
                 noises = {}
-                noise_idx = 0
                 # randomly change current model @ each mini-mini-batch
                 if args.sharpness_smoothing:
-                    for p in model.parameters():
+                    for key, p in model.named_parameters():
+                      if hasattr(model, 'quiet_parameters') and (key in model.quiet_parameters):
+                          continue
                       if args.smoothing_type == 'adaptive':
                           noise_coef = p.std().data
-                      #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
                       noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
-                      noises[noise_idx] = noise
-                      noise_idx += 1
+                      noises[key] = noise
                       p.data.add_(noise)
 
                 mini_target_var = mini_targets[k]
@@ -382,12 +381,11 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 # compute gradient and do SGD step
                 loss.backward()
 
-                # denoise @ each mini-mini-batch. Do we need denoising???
-                noise_idx = 0
+                # denoise @ each mini-mini-batch.
                 if args.sharpness_smoothing:
-                    for p in model.parameters():
-                      p.data.sub_(noises[noise_idx])
-                      noise_idx += 1
+                    for key, p in model.named_parameters():
+                      if key in noises:
+                        p.data.sub_(noises[key])
 
             if is_updating:
               n_batches = args.batch_multiplier
