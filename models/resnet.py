@@ -202,7 +202,7 @@ def resnet(**kwargs):
         kwargs.get, ['num_classes', 'depth', 'dataset'])
     if dataset == 'imagenet':
         num_classes = num_classes or 1000
-        depth = depth or 50
+        depth = depth or 18
         if depth == 18:
             return ResNet_imagenet(num_classes=num_classes,
                                    block=BasicBlock, layers=[2, 2, 2, 2])
