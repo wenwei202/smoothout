@@ -82,8 +82,10 @@ parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)')
+parser.add_argument('--weight-decay', '--wd', default=None, type=float,
+                    metavar='W', help='weight decay (default: None)')
+parser.add_argument('--dropout', default=None, type=float,
+                    metavar='DROPOUT', help='dropout ratio (default: None)')
 parser.add_argument('--sharpness-smoothing', '--ss', default=0.0, type=float,
                     metavar='SS', help='sharpness smoothing (default: 0)')
 parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
@@ -182,6 +184,7 @@ def main():
     }
     transform = getattr(model, 'input_transform', default_transform)
     if args.optimizer == 'Adam':
+      assert(args.weight_decay)
       regime = {0: {'optimizer': args.optimizer,
                 'lr': args.lr,
                 'weight_decay': args.weight_decay}}
@@ -190,6 +193,8 @@ def main():
                                            'lr': args.lr,
                                            'momentum': args.momentum,
                                            'weight_decay': args.weight_decay}})
+      if args.weight_decay:
+          regime[0]['weight_decay'] = args.weight_decay
     adapted_regime = {}
     for e, v in regime.items():
         if args.lr_bb_fix and 'lr' in v:
