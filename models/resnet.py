@@ -2,7 +2,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 import math
 
-__all__ = ['resnet']
+__all__ = ['resnet', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -227,5 +227,90 @@ def resnet(**kwargs):
     elif dataset == 'cifar100':
         num_classes = num_classes or 100
         depth = depth or 44
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+
+def resnet18(**kwargs):
+    num_classes, dataset = map(
+        kwargs.get, ['num_classes', 'dataset'])
+    depth = 18
+    if dataset == 'imagenet':
+        num_classes = num_classes or 1000
+        return ResNet_imagenet(num_classes=num_classes,
+                                   block=BasicBlock, layers=[2, 2, 2, 2])
+    elif dataset == 'cifar10':
+        num_classes = num_classes or 10
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+    elif dataset == 'cifar100':
+        num_classes = num_classes or 100
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+
+def resnet34(**kwargs):
+    num_classes, dataset = map(
+        kwargs.get, ['num_classes', 'dataset'])
+    depth = 34
+    if dataset == 'imagenet':
+        num_classes = num_classes or 1000
+        return ResNet_imagenet(num_classes=num_classes,
+                               block=BasicBlock, layers=[3, 4, 6, 3])
+    elif dataset == 'cifar10':
+        num_classes = num_classes or 10
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+    elif dataset == 'cifar100':
+        num_classes = num_classes or 100
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+
+def resnet50(**kwargs):
+    num_classes, dataset = map(
+        kwargs.get, ['num_classes', 'dataset'])
+    depth = 50
+    if dataset == 'imagenet':
+        num_classes = num_classes or 1000
+        return ResNet_imagenet(num_classes=num_classes,
+                               block=Bottleneck, layers=[3, 4, 6, 3])
+    elif dataset == 'cifar10':
+        num_classes = num_classes or 10
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+    elif dataset == 'cifar100':
+        num_classes = num_classes or 100
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+
+def resnet101(**kwargs):
+    num_classes, dataset = map(
+        kwargs.get, ['num_classes', 'dataset'])
+    depth = 101
+    if dataset == 'imagenet':
+        num_classes = num_classes or 1000
+        return ResNet_imagenet(num_classes=num_classes,
+                               block=Bottleneck, layers=[3, 4, 23, 3])
+    elif dataset == 'cifar10':
+        num_classes = num_classes or 10
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+    elif dataset == 'cifar100':
+        num_classes = num_classes or 100
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+
+def resnet152(**kwargs):
+    num_classes, dataset = map(
+        kwargs.get, ['num_classes', 'dataset'])
+    depth = 152
+    if dataset == 'imagenet':
+        num_classes = num_classes or 1000
+        return ResNet_imagenet(num_classes=num_classes,
+                               block=Bottleneck, layers=[3, 8, 36, 3])
+    elif dataset == 'cifar10':
+        num_classes = num_classes or 10
+        return ResNet_cifar10(num_classes=num_classes,
+                              block=BasicBlock, depth=depth)
+    elif dataset == 'cifar100':
+        num_classes = num_classes or 100
         return ResNet_cifar10(num_classes=num_classes,
                               block=BasicBlock, depth=depth)
