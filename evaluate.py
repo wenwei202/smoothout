@@ -1,6 +1,4 @@
 import pdb
-import numpy as np
-import copy
 import argparse
 import os
 import time
@@ -21,23 +19,22 @@ from utils import *
 from ast import literal_eval
 from torch.nn.utils import clip_grad_norm
 from math import ceil
+import numpy as np
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
                      and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ConvNet Training')
-parser.add_argument('--augment', dest='augment', action='store_true',
-                    help='data augment')
-parser.add_argument('--no-augment', dest='augment', action='store_false',
-                    help='data augment')
-parser.set_defaults(augment=False)
+
 parser.add_argument('--results_dir', metavar='RESULTS_DIR',
                     default='./TrainingResults', help='results dir')
 parser.add_argument('--save', metavar='SAVE', default='',
                     help='saved folder')
 parser.add_argument('--dataset', metavar='DATASET', default='cifar10',
                     help='dataset name or folder')
+parser.add_argument('--mode', metavar='MODE', default='val',
+                    help='val or train')
 parser.add_argument('--model', '-a', metavar='MODEL', default='resnet',
                     choices=model_names,
                     help='model architecture: ' +
@@ -51,8 +48,8 @@ parser.add_argument('--type', default='torch.cuda.FloatTensor',
                     help='type of tensor - e.g torch.cuda.HalfTensor')
 parser.add_argument('--gpus', default='0',
                     help='gpus used for training - e.g 0,1,3')
-parser.add_argument('-j', '--workers', default=8, type=int, metavar='N',
-                    help='number of data loading workers (default: 8)')
+parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
+                    help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=200, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
@@ -62,35 +59,51 @@ parser.add_argument('-b', '--batch-size', default=2048, type=int,
 parser.add_argument('-mb', '--mini-batch-size', default=128, type=int,
                     help='mini-mini-batch size (default: 128)')
 parser.add_argument('--lr_bb_fix', dest='lr_bb_fix', action='store_true',
-                    help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
+                    help='learning rate fix for big batch lr =  lr0*(batch_size*batch_multiplier/128)**0.5')
 parser.add_argument('--no-lr_bb_fix', dest='lr_bb_fix', action='store_false',
-                    help='learning rate fix for big batch lr =  lr0*(batch_size/128)**0.5')
+                    help='learning rate fix for big batch lr =  lr0*(batch_size*batch_multiplier/128)**0.5')
 parser.set_defaults(lr_bb_fix=True)
+parser.add_argument('--save_all', dest='save_all', action='store_true',
+                    help='save all better checkpoints')
+parser.add_argument('--no-save_all', dest='save_all', action='store_false',
+                    help='save all better checkpoints')
+parser.set_defaults(save_all=False)
+parser.add_argument('--augment', dest='augment', action='store_true',
+                    help='data augment')
+parser.add_argument('--no-augment', dest='augment', action='store_false',
+                    help='data augment')
+parser.set_defaults(augment=True)
 parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true',
-                    help='regime fix for big batch e = e0*(batch_size/128)')
+                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/128)')
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
-                    help='regime fix for big batch e = e0*(batch_size/128)')
+                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/128)')
 parser.set_defaults(regime_bb_fix=False)
 parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
                     help='optimizer function used')
-parser.add_argument('--lr', '--learning_rate', default=0.1, type=float,
+parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)')
-parser.add_argument('--sharpness-smoothing', '--ss', default=1e-4, type=float,
-                    metavar='SS', help='sharpness smoothing (default: 1e-4)')
+parser.add_argument('--weight-decay', '--wd', default=None, type=float,
+                    metavar='W', help='weight decay (default: None)')
+parser.add_argument('--dropout', default=None, type=float,
+                    metavar='DROPOUT', help='dropout ratio (default: None)')
+parser.add_argument('--sharpness-smoothing', '--ss', default=0.0, type=float,
+                    metavar='SS', help='sharpness smoothing (default: 0)')
+parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
+                    metavar='AI', help='Annealing index of noise (default: 0.55)')
+parser.add_argument('--tanh-scale', '--ts', default=10., type=float,
+                    metavar='TS', help='scale of transition in tanh')
+parser.add_argument('--smoothing-type', default='constant', type=str, metavar='ST',
+                    help='The type of chaning smoothing noise: constant, anneal, tanh or adaptive')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', type=str, metavar='FILE',
-                    help='master evaluate model FILE on validation set')
-parser.add_argument('-se', '--slave-evaluate', type=str, metavar='FILE',
-                    help='slave evaluate model FILE on validation set')
-parser.add_argument('--alpha', type=str, default='-1.0:0.1:2.01', metavar='FILE',
-                    help='coefficient of linear combination of parameters of master and slave model')
+                    help='evaluate model FILE on validation set')
+parser.add_argument('--batch-multiplier', '-bm', default=1, type=int,
+                    metavar='BM', help='The number of batchs to delay parameter updating (default: 1). Used for very large-batch training using limited memory')
 
 def main():
     #torch.manual_seed(123)
@@ -98,7 +111,7 @@ def main():
     best_prec1 = 0
     args = parser.parse_args()
     if args.regime_bb_fix:
-            args.epochs *= (int)(ceil(args.batch_size / args.mini_batch_size))
+            args.epochs *= (int)(ceil(args.batch_size*args.batch_multiplier / args.mini_batch_size))
 
     if args.evaluate:
         args.results_dir = '/tmp'
@@ -108,14 +121,14 @@ def main():
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     else:
-        raise OSError('Directory {%s} exists. Use a new one.' % save_path)
+      raise OSError('Directory {%s} exists. Use a new one.' % save_path)
 
     setup_logging(os.path.join(save_path, 'log.txt'))
     results_file = os.path.join(save_path, 'results.%s')
     results = ResultsLog(results_file % 'csv', results_file % 'html')
 
     logging.info("saving to %s", save_path)
-    logging.debug("run arguments: %s", args)
+    logging.info("run arguments: %s", args)
 
     if 'cuda' in args.type:
         #torch.cuda.manual_seed_all(123)
@@ -136,31 +149,20 @@ def main():
     model = model(**model_config)
     logging.info("created model with configuration: %s", model_config)
 
-
-    # optionally preload from a slave and master models
-    slave_checkpoint = None
-    master_checkpoint = None
-    alpha = [0.]
-    if args.slave_evaluate:
-      if not os.path.isfile(args.slave_evaluate):
-        parser.error('invalid slave checkpoint: {}'.format(args.slave_evaluate))
-      slave_checkpoint = torch.load(args.slave_evaluate, map_location=lambda storage, loc: storage)
-      logging.info("loaded slave checkpoint '%s' (epoch %s)",
-                   args.slave_evaluate, slave_checkpoint['epoch'])
-      alpha_str = args.alpha.split(':')
-      alpha = np.arange(float(alpha_str[0]),float(alpha_str[2]),float(alpha_str[1]))
-    else:
-      raise ImportError("Please specify your slave model path.")
-
     # optionally resume from a checkpoint
     if args.evaluate:
         if not os.path.isfile(args.evaluate):
             parser.error('invalid checkpoint: {}'.format(args.evaluate))
-        master_checkpoint = torch.load(args.evaluate, map_location=lambda storage, loc: storage)
+        checkpoint = torch.load(args.evaluate, map_location=lambda storage, loc: storage)
+        model.load_state_dict(checkpoint['state_dict'])
         logging.info("loaded checkpoint '%s' (epoch %s)",
-                     args.evaluate, master_checkpoint['epoch'])
+                     args.evaluate, checkpoint['epoch'])
     else:
-        raise ImportError("Please specify your master model path.")
+        raise ValueError('Please specify checkpoint file')
+
+
+    num_parameters = sum([l.nelement() for l in model.parameters()])
+    logging.info("number of parameters: %d", num_parameters)
 
     # Data loading code
     default_transform = {
@@ -183,75 +185,31 @@ def main():
         num_workers=args.workers, pin_memory=True)
     train_data = get_dataset(args.dataset, 'train', transform['train'])
     train_loader = torch.utils.data.DataLoader(
-      train_data,
-      batch_size=args.batch_size, shuffle=True,
-      num_workers=args.workers, pin_memory=True)
+        train_data,
+        batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        if not args.slave_evaluate:
-          raise ValueError('Please set --args.slave_evaluate')
-
-        data_res = np.zeros((len(alpha), 4))
-        data_idx = 0
-        # for each alpha, modify weights and evaluate
-        for _alpha in alpha:
-          mydict = {}
-          for key, value in slave_checkpoint['state_dict'].iteritems():
-            np_val = value.cpu().numpy() * _alpha + (1 - _alpha) * master_checkpoint['state_dict'][key].cpu().numpy()
-            mydict[key] = torch.from_numpy(np_val).cuda()
-          model.load_state_dict(mydict)
-
-          val_result = validate(val_loader, model, criterion, 0)
-          val_loss, val_prec1, val_prec5 = [val_result[r]
-                                            for r in ['loss', 'prec1', 'prec5']]
-          logging.info('\nalpha {_alpha} \t'
-                       'Validation Loss {val_loss:.4f} \t'
-                       'Validation Prec@1 {val_prec1:.3f} \t'
-                       'Validation Prec@5 {val_prec5:.3f} \n'
-                       .format(_alpha=_alpha,
-                               val_loss=val_loss,
-                               val_prec1=val_prec1,
-                               val_prec5=val_prec5))
-
-          train_result = validate(train_loader, model, criterion, 0)
-          train_loss, train_prec1, train_prec5 = [train_result[r]
-                                            for r in ['loss', 'prec1', 'prec5']]
-          logging.info('\nalpha {_alpha} \t'
-                       'Train Loss {train_loss:.4f} \t'
-                       'Train Prec@1 {train_prec1:.3f} \t'
-                       'Train Prec@5 {train_prec5:.3f} \n'
-                       .format(_alpha=_alpha,
-                               train_loss= train_loss,
-                               train_prec1=train_prec1,
-                               train_prec5=train_prec5))
-          data_res[data_idx, 0] = val_loss
-          data_res[data_idx, 1] = val_prec1
-          data_res[data_idx, 2] = train_loss
-          data_res[data_idx, 3] = train_prec1
-          data_idx += 1
-
-        # plotting
-        import matplotlib.pyplot as plt
-        fig, ax1 = plt.subplots()
-        ax2 = ax1.twinx()
-        ax1.semilogy(alpha, data_res[:, 0], 'b--')
-        ax1.semilogy(alpha, data_res[:, 2], 'b-')
-        #ax1.plot(alpha, data_res[:, 0], 'b-')
-        #ax1.plot(alpha, data_res[:, 2], 'b--')
-
-        ax2.plot(alpha, data_res[:, 1], 'r--')
-        ax2.plot(alpha, data_res[:, 3], 'r-')
-
-        ax1.set_xlabel('alpha')
-        ax1.set_ylabel('Cross Entropy', color='b')
-        ax2.set_ylabel('Accuracy', color='r')
-        ax1.legend(('Test', 'Train'), loc=0)
-
-#        ax1.grid(b=True, which='both')
-        plt.savefig('res.pdf')
-        plt.show()
-        print 'Done'
+        if args.mode == 'val':
+          my_result = validate(val_loader, model, criterion, 0)
+        elif args.mode == 'train':
+          my_result = validate(train_loader, model, criterion, 0)
+        else:
+            raise ValueError('Unknown --mode')
+        my_loss, my_prec1, my_prec5 = [my_result[r]
+                                          for r in ['loss', 'prec1', 'prec5']]
+        logging.info('\n Loss {my_loss:.4f} \t'
+                     ' Prec@1 {my_prec1:.3f} \t'
+                     ' Prec@5 {my_prec5:.3f} \n'
+                     .format(my_loss= my_loss,
+                             my_prec1=my_prec1,
+                             my_prec5=my_prec5))
         return
+    else:
+        raise NotImplementedError('Backprop not implemented.')
+
+
+
 
 def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=None):
     if args.gpus and len(args.gpus) > 1:
@@ -265,6 +223,8 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
     end = time.time()
 
+    if training:
+        optimizer.zero_grad()
 
     for i, (inputs, target) in enumerate(data_loader):
         # measure data loading time
@@ -276,7 +236,24 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
         # compute output
         if not training:
+            noises = {}
+            # randomly change current model @ each mini-mini-batch
+            if args.sharpness_smoothing:
+                for key, p in model.named_parameters():
+                    if hasattr(model, 'quiet_parameters') and (key in model.quiet_parameters):
+                        continue
+                    noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing
+                    noises[key] = noise
+                    p.data.add_(noise)
+
             output = model(input_var)
+
+            # denoise @ each mini-mini-batch.
+            if args.sharpness_smoothing:
+                for key, p in model.named_parameters():
+                    if key in noises:
+                        p.data.sub_(noises[key])
+
             loss = criterion(output, target_var)
 
             # measure accuracy and record loss
@@ -286,46 +263,7 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             top5.update(prec5[0], input_var.size(0))
 
         else:
-            mini_inputs = input_var.chunk(args.batch_size // args.mini_batch_size)
-            mini_targets = target_var.chunk(args.batch_size // args.mini_batch_size)
-
-
-            optimizer.zero_grad()
-
-            for k, mini_input_var in enumerate(mini_inputs):
-
-                noises = {}
-                noise_idx = 0
-                # randomly change current model @ each mini-mini-batch
-                for p in model.parameters():
-                  noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * args.lr
-                  #noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * optimizer.param_groups[0]['lr']
-                  noises[noise_idx] = noise
-                  noise_idx += 1
-                  p.data.add_(noise)
-
-                mini_target_var = mini_targets[k]
-                output = model(mini_input_var)
-                loss = criterion(output, mini_target_var)
-
-                prec1, prec5 = accuracy(output.data, mini_target_var.data, topk=(1, 5))
-                losses.update(loss.data[0], mini_input_var.size(0))
-                top1.update(prec1[0], mini_input_var.size(0))
-                top5.update(prec5[0], mini_input_var.size(0))
-
-                # compute gradient and do SGD step
-                loss.backward()
-
-                # denoise @ each mini-mini-batch. Do we need denoising???
-                noise_idx = 0
-                for p in model.parameters():
-                  p.data.sub_(noises[noise_idx])
-                  noise_idx += 1
-
-            for p in model.parameters():
-                p.grad.data.div_(len(mini_inputs))
-            clip_grad_norm(model.parameters(), 5.)
-            optimizer.step()
+            raise NotImplementedError('Training is disabled.')
 
 
         # measure elapsed time
