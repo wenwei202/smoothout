@@ -71,6 +71,11 @@ parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true'
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
                     help='regime fix for big batch e = e0*(batch_size/128)')
 parser.set_defaults(regime_bb_fix=False)
+parser.add_argument('--visualize_train', dest='visualize_train', action='store_true',
+                    help='visualize train sharpness')
+parser.add_argument('--no-visualize_train', dest='visualize_train', action='store_false',
+                    help='visualize train sharpness')
+parser.set_defaults(visualize_train=True)
 parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
                     help='optimizer function used')
 parser.add_argument('--lr', '--learning_rate', default=0.1, type=float,
@@ -212,22 +217,22 @@ def main():
                                val_loss=val_loss,
                                val_prec1=val_prec1,
                                val_prec5=val_prec5))
-
-          train_result = validate(train_loader, model, criterion, 0)
-          train_loss, train_prec1, train_prec5 = [train_result[r]
-                                            for r in ['loss', 'prec1', 'prec5']]
-          logging.info('\nalpha {_alpha} \t'
-                       'Train Loss {train_loss:.4f} \t'
-                       'Train Prec@1 {train_prec1:.3f} \t'
-                       'Train Prec@5 {train_prec5:.3f} \n'
-                       .format(_alpha=_alpha,
-                               train_loss= train_loss,
-                               train_prec1=train_prec1,
-                               train_prec5=train_prec5))
+          if args.visualize_train:
+            train_result = validate(train_loader, model, criterion, 0)
+            train_loss, train_prec1, train_prec5 = [train_result[r]
+                                              for r in ['loss', 'prec1', 'prec5']]
+            logging.info('\nalpha {_alpha} \t'
+                         'Train Loss {train_loss:.4f} \t'
+                         'Train Prec@1 {train_prec1:.3f} \t'
+                         'Train Prec@5 {train_prec5:.3f} \n'
+                         .format(_alpha=_alpha,
+                                 train_loss= train_loss,
+                                 train_prec1=train_prec1,
+                                 train_prec5=train_prec5))
+            data_res[data_idx, 2] = train_loss
+            data_res[data_idx, 3] = train_prec1
           data_res[data_idx, 0] = val_loss
           data_res[data_idx, 1] = val_prec1
-          data_res[data_idx, 2] = train_loss
-          data_res[data_idx, 3] = train_prec1
           data_idx += 1
 
         # plotting
@@ -235,17 +240,22 @@ def main():
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
         ax1.semilogy(alpha, data_res[:, 0], 'b--')
-        ax1.semilogy(alpha, data_res[:, 2], 'b-')
+        if args.visualize_train:
+          ax1.semilogy(alpha, data_res[:, 2], 'b-')
         #ax1.plot(alpha, data_res[:, 0], 'b-')
         #ax1.plot(alpha, data_res[:, 2], 'b--')
 
         ax2.plot(alpha, data_res[:, 1], 'r--')
-        ax2.plot(alpha, data_res[:, 3], 'r-')
+        if args.visualize_train:
+          ax2.plot(alpha, data_res[:, 3], 'r-')
 
         ax1.set_xlabel('alpha')
         ax1.set_ylabel('Cross Entropy', color='b')
         ax2.set_ylabel('Accuracy', color='r')
-        ax1.legend(('Test', 'Train'), loc=0)
+        if args.visualize_train:
+          ax1.legend(('Test', 'Train'), loc=0)
+        else:
+          ax1.legend(('Test'), loc=0)
 
 #        ax1.grid(b=True, which='both')
         plt.savefig('res.pdf')
