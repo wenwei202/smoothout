@@ -369,8 +369,9 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                       if hasattr(model, 'quiet_parameters') and (key in model.quiet_parameters):
                           continue
                       if args.smoothing_type == 'adaptive':
-                          noise_coef = p.std().data
-                      noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
+                        noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * torch.abs(p.data)
+                      else:
+                        noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
                       noises[key] = noise
                       p.data.add_(noise)
 
