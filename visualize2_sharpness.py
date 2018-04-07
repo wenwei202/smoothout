@@ -190,7 +190,17 @@ def main():
         directions={}
         for key, p in model.named_parameters():
             _direction = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.)
-            _direction = _direction/_direction.norm()*p.norm().data
+            #_direction = _direction/_direction.norm()*p.norm().data
+            #_direction = torch.cuda.FloatTensor(p.size()).normal_()
+            for idx in range(0, _direction.shape[0]):
+                if 1==len(_direction.shape):
+                  _direction[idx] = _direction[idx] / _direction[idx] * p.data[idx]
+                else:
+                  _direction[idx] = _direction[idx]/_direction[idx].norm()*p.data[idx].norm()
+
+            #_direction = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * torch.abs(p.data)
+
+            #_direction = torch.abs(p.data)
             directions[key] = _direction
 
         data_res = np.zeros((len(alpha), 4))
@@ -217,7 +227,15 @@ def main():
                                val_prec1=val_prec1,
                                val_prec5=val_prec5))
           if args.visualize_train:
+
+            for key, p in model.named_parameters():
+                p.data.add_(directions[key] * _alpha)
+
             train_result = validate(train_loader, model, criterion, 0)
+
+            for key, p in model.named_parameters():
+                p.data.sub_(directions[key] * _alpha)
+
             train_loss, train_prec1, train_prec5 = [train_result[r]
                                               for r in ['loss', 'prec1', 'prec5']]
             logging.info('\nalpha {_alpha} \t'
