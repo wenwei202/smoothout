@@ -194,7 +194,7 @@ def main():
             #_direction = torch.cuda.FloatTensor(p.size()).normal_()
             for idx in range(0, _direction.shape[0]):
                 if 1==len(_direction.shape):
-                  _direction[idx] = _direction[idx] / _direction[idx] * p.data[idx]
+                  _direction[idx] = _direction[idx] /np.linalg.norm(_direction[idx]) * np.linalg.norm(p.data[idx])
                 else:
                   _direction[idx] = _direction[idx]/_direction[idx].norm()*p.data[idx].norm()
 

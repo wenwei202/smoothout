@@ -93,7 +93,9 @@ parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
 parser.add_argument('--tanh-scale', '--ts', default=10., type=float,
                     metavar='TS', help='scale of transition in tanh')
 parser.add_argument('--smoothing-type', default='constant', type=str, metavar='ST',
-                    help='The type of chaning smoothing noise: constant, anneal, tanh or adaptive')
+                    help='The type of chaning smoothing noise: constant, anneal or tanh')
+parser.add_argument('--adapt-type', default='none', type=str, metavar='AT',
+                    help='The type of adapting noise: none, weight or filter')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -350,8 +352,6 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
             elif args.smoothing_type == 'tanh':
               noise_coef = np.tanh(args.tanh_scale*((float)(epoch * eq_batch_num + i//args.batch_multiplier)/(float)(args.epochs * eq_batch_num) -.5))
               noise_coef = (noise_coef + 1.)/2.0
-            elif args.smoothing_type == 'adaptive':
-                noise_coef = -1.0
             else: raise ValueError('Unknown smoothing-type')
             if i % args.print_freq == 0:
               logging.info('{phase} - Epoch: [{0}][{1}/{2}]\t'
@@ -368,10 +368,24 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                     for key, p in model.named_parameters():
                       if hasattr(model, 'quiet_parameters') and (key in model.quiet_parameters):
                           continue
-                      if args.smoothing_type == 'adaptive':
-                        noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * torch.abs(p.data)
-                      else:
+
+                      if args.adapt_type == 'weight':
+                        noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * torch.abs(p.data) * noise_coef
+
+                      elif args.adapt_type == 'filter':
+                        noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.)
+                        for idx in range(0, noise.shape[0]):
+                          if 1 == len(noise.shape):
+                            noise[idx] = noise[idx] / np.linalg.norm(noise[idx]) * np.linalg.norm(p.data[idx])
+                          else:
+                            noise[idx] = noise[idx] / noise[idx].norm() * p.data[idx].norm()
+                        noise = noise * args.sharpness_smoothing * noise_coef
+
+                      elif args.adapt_type == 'none':
                         noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
+
+                      else:
+                          raise ValueError('Unkown --adapt-type')
                       noises[key] = noise
                       p.data.add_(noise)
 
