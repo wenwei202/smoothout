@@ -376,9 +376,11 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                         noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.)
                         for idx in range(0, noise.shape[0]):
                           if 1 == len(noise.shape):
-                            noise[idx] = noise[idx] / np.linalg.norm(noise[idx]) * np.linalg.norm(p.data[idx])
+                            if np.abs(np.linalg.norm(noise[idx]))>1.0e-6:
+                              noise[idx] = noise[idx] / np.linalg.norm(noise[idx]) * np.linalg.norm(p.data[idx])
                           else:
-                            noise[idx] = noise[idx] / noise[idx].norm() * p.data[idx].norm()
+                            if np.abs(noise[idx].norm())>1.0e-6:
+                              noise[idx] = noise[idx] / noise[idx].norm() * p.data[idx].norm()
                         noise = noise * args.sharpness_smoothing * noise_coef
 
                       elif args.adapt_type == 'none':
