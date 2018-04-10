@@ -374,13 +374,21 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
                       elif args.adapt_type == 'filter':
                         noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.)
-                        for idx in range(0, noise.shape[0]):
-                          if 1 == len(noise.shape):
-                            if np.abs(np.linalg.norm(noise[idx]))>1.0e-6:
-                              noise[idx] = noise[idx] / np.linalg.norm(noise[idx]) * np.linalg.norm(p.data[idx])
-                          else:
-                            if np.abs(noise[idx].norm())>1.0e-6:
-                              noise[idx] = noise[idx] / noise[idx].norm() * p.data[idx].norm()
+                        noise_shape = noise.shape
+                        noise_norms = noise.view([noise_shape[0],-1]).norm(p=2, dim=1) + 1.0e-6
+                        p_norms = p.view([noise_shape[0], -1]).norm(p=2, dim=1)
+                        for shape_idx in range(1, len(noise_shape)):
+                            noise_norms = noise_norms.unsqueeze(-1)
+                            p_norms = p_norms.unsqueeze(-1)
+                        noise = noise / noise_norms * p_norms.data
+                        #for idx in range(0, noise.shape[0]):
+                        #  if 1 == len(noise.shape):
+                        #    if np.abs(np.linalg.norm(noise[idx]))>1.0e-6:
+                        #      noise[idx] = noise[idx] / np.linalg.norm(noise[idx]) * np.linalg.norm(p.data[idx])
+                        #  else:
+                        #    if np.abs(noise[idx].norm())>1.0e-6:
+                        #      noise[idx] = noise[idx] / noise[idx].norm() * p.data[idx].norm()
+
                         noise = noise * args.sharpness_smoothing * noise_coef
 
                       elif args.adapt_type == 'none':
