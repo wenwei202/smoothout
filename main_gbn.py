@@ -186,7 +186,7 @@ def main():
     }
     transform = getattr(model, 'input_transform', default_transform)
     if args.optimizer == 'Adam':
-      assert(args.weight_decay)
+      assert(args.weight_decay is not None)
       regime = {0: {'optimizer': args.optimizer,
                 'lr': args.lr,
                 'weight_decay': args.weight_decay}}
