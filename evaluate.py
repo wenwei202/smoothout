@@ -72,7 +72,7 @@ parser.add_argument('--augment', dest='augment', action='store_true',
                     help='data augment')
 parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='data augment')
-parser.set_defaults(augment=True)
+parser.set_defaults(augment=False)
 parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true',
                     help='regime fix for big batch e = e0*(batch_size*batch_multiplier/128)')
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',

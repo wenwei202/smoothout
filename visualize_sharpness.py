@@ -96,6 +96,8 @@ parser.add_argument('-se', '--slave-evaluate', type=str, metavar='FILE',
                     help='slave evaluate model FILE on validation set')
 parser.add_argument('--alpha', type=str, default='-1.0:0.1:2.01', metavar='FILE',
                     help='coefficient of linear combination of parameters of master and slave model')
+parser.add_argument('--mode', type=str, default='linear', metavar='MODE',
+                    help='How to combine: linear or sin')
 
 def main():
     #torch.manual_seed(123)
@@ -202,7 +204,14 @@ def main():
         for _alpha in alpha:
           mydict = {}
           for key, value in slave_checkpoint['state_dict'].iteritems():
-            np_val = value.cpu().numpy() * _alpha + (1 - _alpha) * master_checkpoint['state_dict'][key].cpu().numpy()
+            if args.mode == 'linear':
+                np_val = value.cpu().numpy() * _alpha + (1 - _alpha) * master_checkpoint['state_dict'][key].cpu().numpy()
+            elif args.mode == 'sin':
+                _tmp_alpha = (1.0 + np.sin(_alpha * np.pi - np.pi/2.0))/2.0
+                np_val = value.cpu().numpy() * _tmp_alpha + (1 - _tmp_alpha) * master_checkpoint['state_dict'][key].cpu().numpy()
+            else:
+                raise ValueError('Unkown --mode')
+
             mydict[key] = torch.from_numpy(np_val).cuda()
           model.load_state_dict(mydict)
 
