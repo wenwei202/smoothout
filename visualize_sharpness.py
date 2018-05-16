@@ -246,25 +246,30 @@ def main():
 
         # plotting
         import matplotlib.pyplot as plt
+        clr1 = (0.2667,0.4431,0.7686)
+        clr2 = (0.9294, 0.4902, 0.2000)
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
-        ax1.semilogy(alpha, data_res[:, 0], 'b--')
+        ax1.semilogy(alpha, data_res[:, 0], 'o--', color=clr1, mfc=clr1, markersize=4)
         if args.visualize_train:
-          ax1.semilogy(alpha, data_res[:, 2], 'b-')
+          ax1.semilogy(alpha, data_res[:, 2], 'o-', color=clr1, mfc=clr1, markersize=4)
         #ax1.plot(alpha, data_res[:, 0], 'b-')
         #ax1.plot(alpha, data_res[:, 2], 'b--')
 
-        ax2.plot(alpha, data_res[:, 1], 'r--')
+        ax2.plot(alpha, data_res[:, 1], 'o--', color=clr2, mfc=clr2, markersize=4)
         if args.visualize_train:
-          ax2.plot(alpha, data_res[:, 3], 'r-')
+          ax2.plot(alpha, data_res[:, 3], 'o-', color=clr2, mfc=clr2, markersize=4)
 
-        ax1.set_xlabel('alpha')
-        ax1.set_ylabel('Cross Entropy', color='b')
-        ax2.set_ylabel('Accuracy', color='r')
+        ax1.set_xlabel(r'$\alpha$')
+        ax1.set_ylabel('Loss', color=clr1)
+        ax1.tick_params(axis='y', colors=clr1)
+        ax2.set_ylabel('Accuracy (%)', color=clr2)
+        ax2.tick_params(axis='y', colors=clr2)
         if args.visualize_train:
-          ax1.legend(('Test', 'Train'), loc=0)
+          ax1.legend(('Val loss', 'Train loss'), loc=2)
+          ax2.legend(('Val accuracy', 'Train accuracy'), loc=1)
         else:
-          ax1.legend(('Test'), loc=0)
+          ax1.legend(('Val'), loc=0)
 
 #        ax1.grid(b=True, which='both')
         plt.savefig('res.pdf')
