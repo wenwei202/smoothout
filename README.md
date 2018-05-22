@@ -1,4 +1,9 @@
 # Train longer, generalize better - Big batch training
+## Related paper
+https://arxiv.org/abs/1805.07898
+
+Tutorial to be updated soon.
+
 ## Usage
 
 ```
