@@ -1,6 +1,11 @@
-# Train longer, generalize better - Big batch training
+# SmoothOut: Smoothing Out Sharp Minima for Generalization in Large-Batch Deep Learning
+
 ## Related paper
-https://arxiv.org/abs/1805.07898
+This is code of paper of https://arxiv.org/abs/1805.07898
+In large-batch training of deep neural networks, accuracy loss is observed. Some hypothesize this is because of the existance of sharp minima in deep neural networks. 
+In the paper, smoothout method is proposed to eliminate sharp minima in deep neural networks in large-batch training, such that we can use a larger batch size to improve the scalability of distributed training of deep neural networks.
+
+This code is based on [bigBatch](https://github.com/eladhoffer/bigBatch).
 
 Tutorial to be updated soon.
 
