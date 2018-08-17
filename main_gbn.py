@@ -61,6 +61,8 @@ parser.add_argument('--lr_bb_fix', dest='lr_bb_fix', action='store_true',
 parser.add_argument('--no-lr_bb_fix', dest='lr_bb_fix', action='store_false',
                     help='learning rate fix for big batch lr =  lr0*(batch_size*batch_multiplier/128)**0.5')
 parser.set_defaults(lr_bb_fix=True)
+parser.add_argument('--lr_fix_policy', default='sqrt',
+                    help='sqrt or linear')
 parser.add_argument('--save_all', dest='save_all', action='store_true',
                     help='save all better checkpoints')
 parser.add_argument('--no-save_all', dest='save_all', action='store_false',
@@ -72,10 +74,12 @@ parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='data augment')
 parser.set_defaults(augment=True)
 parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true',
-                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/128)')
+                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/mini_batch_size)')
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
-                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/128)')
+                    help='regime fix for big batch e = e0*(batch_size*batch_multiplier/mini-batch-size)')
 parser.set_defaults(regime_bb_fix=False)
+parser.add_argument('--regime_bb_multi', '-rbm', default=1, type=int,
+                    metavar='N', help='the multiplier to extend epochs (default: 1)')
 parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
                     help='optimizer function used')
 parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
@@ -110,6 +114,7 @@ def main():
     global args, best_prec1
     best_prec1 = 0
     args = parser.parse_args()
+    args.epochs *= args.regime_bb_multi
     if args.regime_bb_fix:
             args.epochs *= (int)(ceil(args.batch_size*args.batch_multiplier / args.mini_batch_size))
 
@@ -200,7 +205,13 @@ def main():
     adapted_regime = {}
     for e, v in regime.items():
         if args.lr_bb_fix and 'lr' in v:
-            v['lr'] *= (args.batch_size*args.batch_multiplier / args.mini_batch_size) ** 0.5
+            if args.lr_fix_policy == 'sqrt':
+                v['lr'] *= (args.batch_size*args.batch_multiplier / args.mini_batch_size) ** 0.5
+            elif args.lr_fix_policy == 'linear':
+                v['lr'] *= (args.batch_size * args.batch_multiplier / args.mini_batch_size)
+            else:
+                raise ValueError('Unknown --lr_fix_policy')
+        e *= args.regime_bb_multi
         if args.regime_bb_fix:
             e *= ceil(args.batch_size*args.batch_multiplier / args.mini_batch_size)
         adapted_regime[e] = v
