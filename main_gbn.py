@@ -92,6 +92,8 @@ parser.add_argument('--dropout', default=None, type=float,
                     metavar='DROPOUT', help='dropout ratio (default: None)')
 parser.add_argument('--sharpness-smoothing', '--ss', default=0.0, type=float,
                     metavar='SS', help='sharpness smoothing (default: 0)')
+parser.add_argument('--relu_noise', default=None, type=float,
+                    help='The noise strength injected into the slope of ReLU')
 parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
                     metavar='AI', help='Annealing index of noise (default: 0.55)')
 parser.add_argument('--tanh-scale', '--ts', default=10., type=float,
@@ -146,7 +148,7 @@ def main():
     # create model
     logging.info("creating model %s", args.model)
     model = models.__dict__[args.model]
-    model_config = {'input_size': args.input_size, 'dataset': args.dataset}
+    model_config = {'input_size': args.input_size, 'dataset': args.dataset, 'noise': args.relu_noise}
 
     if args.model_config is not '':
         model_config = dict(model_config, **literal_eval(args.model_config))
