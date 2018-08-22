@@ -32,12 +32,9 @@ class NoisyReLU(nn.Module):
 
     def forward(self, input):
         if self._buffers['device_flag'].is_cuda:
-            print ('in gpu')
             noise = torch.cuda.FloatTensor(input.size()).uniform_() * (self.b-self.a) + self.a
         else:
-            print ('in cpu')
             noise = torch.FloatTensor(input.size()).uniform_() * (self.b-self.a) + self.a
-        print('noise: ', noise)
         return F.threshold(input * noise, 0, 0, self.inplace)
 
     def extra_repr(self):
