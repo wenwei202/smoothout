@@ -252,13 +252,12 @@ def main():
 
         # train for one epoch
         train_result = train(train_loader, model, criterion, epoch, optimizer)
-
         train_loss, train_prec1, train_prec5 = [
-            train_result[r] for r in ['loss', 'prec1', 'prec5']]
+            train_result[r].data.tolist() for r in ['loss', 'prec1', 'prec5']]
 
         # evaluate on validation set
         val_result = validate(val_loader, model, criterion, epoch)
-        val_loss, val_prec1, val_prec5 = [val_result[r]
+        val_loss, val_prec1, val_prec5 = [val_result[r].data.tolist()
                                           for r in ['loss', 'prec1', 'prec5']]
 
         # remember best prec@1 and save checkpoint
@@ -291,7 +290,7 @@ def main():
         #Enable to measure more layers
         idxs = [0]#,2,4,6,7,8,9,10]#[0, 12, 45, 63]
 
-        step_dist_epoch = {'step_dist_n%s' % k: (w.data.cpu() - init_weights[k]).norm()
+        step_dist_epoch = {'step_dist_n%s' % k: (w.data.cpu() - init_weights[k]).norm().data.tolist()
                            for (k, w) in enumerate(list(model.parameters())) if k in idxs}
 
 
