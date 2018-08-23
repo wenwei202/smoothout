@@ -4,8 +4,11 @@ import numpy as np
 
 m = models.NoisyReLU(a=.9, b=1.1, inplace=True)
 
-for _ in range(1000):
-	x = np.random.rand(30000,2000).astype('f') - 0.5
+for i in range(3):
+	if 2==i:
+		x = np.random.rand(2,2).astype('f') - 0.5
+	else:
+		x = np.random.rand(3,2).astype('f') - 0.5
 	x = torch.from_numpy(x)
 
 	z = x.cuda()
