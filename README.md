@@ -28,9 +28,9 @@ python measure_sharpness.py --model cifar100_shallow --dataset cifar100 --b 100 
 
 ## Dependencies
 
-- [pytorch](<http://www.pytorch.org>)
-- [torchvision](<https://github.com/pytorch/vision>) to load the datasets, perform image transforms
-- [pandas](<http://pandas.pydata.org/>) for logging to csv
+- [pytorch](<http://www.pytorch.org>) ('0.4.1')
+- [torchvision](<https://github.com/pytorch/vision>) to load the datasets, perform image transforms ('0.2.1')
+- [pandas](<http://pandas.pydata.org/>) for logging to csv ('0.23.0')
 - [bokeh](<http://bokeh.pydata.org>) for training visualization `conda install bokeh=0.12.0`
 
 
