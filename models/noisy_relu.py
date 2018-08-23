@@ -29,13 +29,20 @@ class NoisyReLU(nn.Module):
         self.inplace = inplace
         # a flag
         self.register_buffer('device_flag', torch.zeros(1,1))
+        self.register_buffer('noise', None)
 
     def forward(self, input):
         if self._buffers['device_flag'].is_cuda:
-            noise = torch.cuda.FloatTensor(input.size()).uniform_() * (self.b-self.a) + self.a
+            if self._buffers['noise']:
+                self._buffers['noise'].uniform_().mul_(self.b-self.a).add_(self.a)
+            else:
+                self._buffers['noise'] = torch.cuda.FloatTensor(input.size()).uniform_().mul_(self.b-self.a).add_(self.a)
         else:
-            noise = torch.FloatTensor(input.size()).uniform_() * (self.b-self.a) + self.a
-        return F.threshold(input * noise, 0, 0, self.inplace)
+            if self._buffers['noise']:
+                self._buffers['noise'].uniform_().mul_(self.b-self.a).add_(self.a)
+            else:
+                self._buffers['noise'] = torch.FloatTensor(input.size()).uniform_().mul_(self.b-self.a).add_(self.a)
+        return F.threshold(input * self._buffers['noise'], 0, 0, self.inplace)
 
     def extra_repr(self):
         inplace_str = ', inplace' if self.inplace else ''
