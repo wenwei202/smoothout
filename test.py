@@ -25,3 +25,23 @@ for i in range(3):
 	o.backward()
 	print('input.grad: ', z.grad)
 	print('-------------------')
+
+print('=========== eval ============')
+
+m.eval()
+for i in range(2):
+	if 1==i:
+		x = np.random.rand(5,2).astype('f') - 0.5
+	else:
+		x = np.random.rand(1,2).astype('f') - 0.5
+	x = torch.from_numpy(x)
+
+	z = x.cuda()
+	z = torch.autograd.Variable(z)
+	m.cuda()
+
+	print('input: ', z)
+
+	res = m(z)
+	print('output: ', res)
+	print('-------------------')
