@@ -3,8 +3,6 @@
 ## Related paper
 This is the code of paper  https://arxiv.org/abs/1805.07898 . In SGD, especially large-batch SGD, of deep neural networks, [Some](https://arxiv.org/abs/1609.04836) hypothesize that the convergence to sharp minima is the reason of bad generalization. In the paper, smoothout method is proposed to eliminate sharp minima in deep neural networks to improve generalization.
 
-This code is based on [bigBatch](https://github.com/eladhoffer/bigBatch).
-
 Tutorial to be updated soon.
 
 ## Usage
