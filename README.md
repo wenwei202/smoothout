@@ -1,4 +1,4 @@
-# SmoothOut: Smoothing Out Sharp Minima for Generalization in Large-Batch Deep Learning
+# SmoothOut: Smoothing Out Sharp Minima to Improve Generalization in Deep Learning
 
 ## Related paper
 This is the code of paper  https://arxiv.org/abs/1805.07898 . In large-batch training of deep neural networks, accuracy loss is observed. [Some](https://arxiv.org/abs/1609.04836) hypothesize that this is because of the existance of sharp minima in deep neural networks. 
