@@ -387,7 +387,12 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                         noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * torch.abs(p.data) * noise_coef
 
                       elif args.adapt_type == 'filter':
-                        noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.)
+                        if args.noise_type == 'uniform':
+                          noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.)
+                        elif args.noise_type == 'normal':
+                          noise = torch.cuda.FloatTensor(p.size()).normal_()
+                        else:
+                          raise ValueError('Unkown --noise-type')
                         noise_shape = noise.shape
                         noise_norms = noise.view([noise_shape[0],-1]).norm(p=2, dim=1) + 1.0e-6
                         p_norms = p.view([noise_shape[0], -1]).norm(p=2, dim=1)
