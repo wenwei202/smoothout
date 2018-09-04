@@ -102,6 +102,8 @@ parser.add_argument('--smoothing-type', default='constant', type=str, metavar='S
                     help='The type of chaning smoothing noise: constant, anneal or tanh')
 parser.add_argument('--adapt-type', default='none', type=str, metavar='AT',
                     help='The type of adapting noise: none, weight or filter')
+parser.add_argument('--noise-type', default='uniform', type=str, metavar='AT',
+                    help='The type of noise: uniform or normal')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -404,8 +406,12 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                         noise = noise * args.sharpness_smoothing * noise_coef
 
                       elif args.adapt_type == 'none':
-                        noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
-
+                        if args.noise_type == 'uniform':
+                          noise = (torch.cuda.FloatTensor(p.size()).uniform_() * 2. - 1.) * args.sharpness_smoothing * noise_coef
+                        elif args.noise_type == 'normal':
+                          noise = torch.cuda.FloatTensor(p.size()).normal_() * args.sharpness_smoothing * noise_coef
+                        else:
+                          raise ValueError('Unkown --noise-type')
                       else:
                           raise ValueError('Unkown --adapt-type')
                       noises[key] = noise
