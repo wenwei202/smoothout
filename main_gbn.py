@@ -92,6 +92,11 @@ parser.add_argument('--dropout', default=None, type=float,
                     metavar='DROPOUT', help='dropout ratio (default: None)')
 parser.add_argument('--sharpness-smoothing', '--ss', default=0.0, type=float,
                     metavar='SS', help='sharpness smoothing (default: 0)')
+parser.add_argument('--exclude-bn', dest='exclude_bn', action='store_true',
+                    help='exclude perturbation on batch norm')
+parser.add_argument('--no-exclude-bn', dest='exclude_bn', action='store_false',
+                    help='exclude perturbation on batch norm')
+parser.set_defaults(exclude_bn=True)
 parser.add_argument('--relu_noise', default=None, type=float,
                     help='The noise strength injected into the slope of ReLU')
 parser.add_argument('--anneal-index', '--ai', default=0.55, type=float,
@@ -374,6 +379,17 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 phase='TRAINING' if training else 'EVALUATING',
                 noise_coef=noise_coef))
 
+            # exclude parameters in batch norm layers
+            excluded_params = []
+            if args.exclude_bn:
+                for _m in model.modules():
+                    if isinstance(_m, torch.nn.BatchNorm1d) or \
+                            isinstance(_m, torch.nn.BatchNorm2d) or \
+                            isinstance(_m, torch.nn.BatchNorm3d):
+                        for _k, _p in _m.named_parameters():
+                            excluded_params.append(_p)
+
+
             for k, mini_input_var in enumerate(mini_inputs):
 
                 noises = {}
@@ -381,6 +397,8 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 if args.sharpness_smoothing:
                     for key, p in model.named_parameters():
                       if hasattr(model, 'quiet_parameters') and (key in model.quiet_parameters):
+                          continue
+                      if any([p is pp for pp in excluded_params]):
                           continue
 
                       if args.adapt_type == 'weight':
