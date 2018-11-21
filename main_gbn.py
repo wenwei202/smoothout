@@ -78,6 +78,11 @@ parser.add_argument('--regime_bb_fix', dest='regime_bb_fix', action='store_true'
 parser.add_argument('--no-regime_bb_fix', dest='regime_bb_fix', action='store_false',
                     help='regime fix for big batch e = e0*(batch_size*batch_multiplier/mini-batch-size)')
 parser.set_defaults(regime_bb_fix=False)
+parser.add_argument('--denoise', dest='denoise', action='store_true',
+                    help='apply denoising')
+parser.add_argument('--no-denoise', dest='denoise', action='store_false',
+                    help='apply denoising')
+parser.set_defaults(denoise=True)
 parser.add_argument('--regime_bb_multi', '-rbm', default=1, type=int,
                     metavar='N', help='the multiplier to extend epochs (default: 1)')
 parser.add_argument('--optimizer', default='SGD', type=str, metavar='OPT',
@@ -453,7 +458,7 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
                 loss.backward()
 
                 # denoise @ each mini-mini-batch.
-                if args.sharpness_smoothing:
+                if args.sharpness_smoothing and args.denoise:
                     for key, p in model.named_parameters():
                       if key in noises:
                         p.data.sub_(noises[key])
